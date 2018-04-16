@@ -58,6 +58,10 @@ n_episode = 200000    # 20000
 max_steps = 30    # 35
 episodes_before_train = 50     # 50 ? Not specified in paper
 
+snapshot_path = "/home/jadeng/Documents/snapshot/ref/"
+snapshot_name = "reference_latest_episode_"
+path = snapshot_path + snapshot_name + '800'
+
 maddpg = MADDPG(n_agents,
                 dim_obs_list,
                 dim_act_list,
@@ -144,7 +148,6 @@ for i_episode in range(n_episode):
             idx += x
         # pdb.set_trace()
         obs_, reward, done, _ = env.step(action_ls)
-
         total_reward += sum(reward)
         reward = th.FloatTensor(reward).type(FloatTensor)
 
@@ -166,6 +169,7 @@ for i_episode in range(n_episode):
             av_critics_grad += np.array(critics_grad)
             av_actors_grad += np.array(actors_grad)
             n += 1
+    pdb.set_trace()
     for agent_i in range(2):
         for goal_i in range(3):
             if env.world.agents[agent_i].goal_b == env.world.landmarks[goal_i]:
