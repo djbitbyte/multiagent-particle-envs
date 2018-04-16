@@ -65,12 +65,13 @@ maddpg = MADDPG(n_agents,
                 capacity,
                 episodes_before_train,
                 action_noise="Gaussian_noise",  # ou_noises
-                load_models=None)               # path
+                load_models=path)               # path
 
 FloatTensor = th.cuda.FloatTensor if maddpg.use_cuda else th.FloatTensor
 
 writer = SummaryWriter()
 
+communication_mappings = np.zeros((n_agents, 3, 3))
 for i_episode in range(n_episode):
     # pdb.set_trace()
     '''
@@ -165,6 +166,10 @@ for i_episode in range(n_episode):
             av_critics_grad += np.array(critics_grad)
             av_actors_grad += np.array(actors_grad)
             n += 1
+    for agent_i in range(2):
+        for goal_i in range(3):
+            if env.world.agents[agent_i].goal_b == env.world.landmarks[goal_i]:
+                communication_mappings[agent_i, goal_i, :] += episode_communications[agent_i, :]
 
     for agent_i in range(n_agents):
         for goal_i in range(3):
