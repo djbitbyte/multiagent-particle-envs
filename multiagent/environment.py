@@ -195,7 +195,7 @@ class MultiAgentEnv(gym.Env):
                     agent.action.u[1] += action[0][3] - action[0][4]
                 else:
                     agent.action.u = action[0]
-            sensitivity = 5
+            sensitivity = 5.0
             # sensitivity = 1.0
             if agent.accel is not None:
                 sensitivity = agent.accel
@@ -236,7 +236,6 @@ class MultiAgentEnv(gym.Env):
                     message += (other.name + ' to ' + agent.name + ': ' + word + '   ')
             if self.print_communication:
                 print(message)
-
 
         if close:
             # close any existic renderers
