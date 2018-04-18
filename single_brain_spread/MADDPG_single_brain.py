@@ -138,12 +138,23 @@ class MADDPG:
 
         ##### actor network #####
         self.actor_optimizer.zero_grad()
-        pdb.set_trace()
+
+        idx = 0
+        actions_ls = []
+        for i in range(self.n_agents):
+            action_i = self.actor(state_batch[:, idx:(idx + self.dim_obs_list[i])])
+            actions_ls.append(action_i)
+            idx += self.dim_obs_list[i]
+            actions = th.cat(actions_ls, 1)
+            whole_action = actions.view(self.batch_size, -1)
+
+        '''
         state_i = state_batch[:, 0:self.dim_obs_list[0]]
         action_i = self.actor(state_i)
         ac = action_batch.clone()
         ac[:, 0:self.dim_act_list[0]] = action_i
         whole_action = ac.view(self.batch_size, -1)
+        '''
 
         actor_loss = -self.critic(whole_state, whole_action)
         actor_loss = actor_loss.mean()

@@ -25,11 +25,11 @@ for i in range(n_agents):
         print(env.action_space[i])
 
 capacity = 30000
-batch_size = 3  # 1024
+batch_size = 1024  # 1024
 
 n_episode = 100000    # 20000
-max_steps = 2    # 35
-episodes_before_train = 2     # 50 ? Not specified in paper
+max_steps = 30    # 35
+episodes_before_train = 50     # 50 ? Not specified in paper
 
 snapshot_path = "/home/jadeng/Documents/snapshot/spread_single_brain/"
 snapshot_name = "spread_single_brain_latest_episode_"
