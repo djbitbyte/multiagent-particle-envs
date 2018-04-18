@@ -60,7 +60,7 @@ class Scenario(BaseScenario):
         # returns data for benchmarking purposes
         return reward(agent, reward)
 
-    def reward(self, agent, world):
+    def reward(self, agent, world, stage=0):
         a = world.agents[0]
         # squared distance and distance from listener to landmark
         dist2 = np.sum(np.square(a.goal_a.state.p_pos - a.goal_b.state.p_pos))

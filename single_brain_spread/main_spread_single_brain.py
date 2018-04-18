@@ -25,11 +25,11 @@ for i in range(n_agents):
         print(env.action_space[i])
 
 capacity = 30000
-batch_size = 1024  # 1024
+batch_size = 3  # 1024
 
 n_episode = 100000    # 20000
-max_steps = 30    # 35
-episodes_before_train = 50     # 50 ? Not specified in paper
+max_steps = 2    # 35
+episodes_before_train = 2     # 50 ? Not specified in paper
 
 snapshot_path = "/home/jadeng/Documents/snapshot/spread_single_brain/"
 snapshot_name = "spread_single_brain_latest_episode_"
@@ -60,6 +60,8 @@ for i_episode in range(n_episode):
         env.set_level(2)
     '''
     env.set_level(2)
+    env.set_stage(1)
+
     obs = env.reset()
     obs = np.concatenate(obs, 0)
     if isinstance(obs, np.ndarray):
@@ -125,7 +127,6 @@ for i_episode in range(n_episode):
     # plot of reward
     writer.add_scalar('data/reward_spread', mean_reward, i_episode)
 
-    pdb.set_trace()
     # plot of agent0 - speaker gradient of critic net
     for i in range(6):
         writer.add_scalar('data/agent0_critic_gradient', av_critics_grad[0][i], i_episode)

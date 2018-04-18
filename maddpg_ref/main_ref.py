@@ -65,7 +65,7 @@ for i_episode in range(n_episode):
     if i_episode < 3000:
         env.set_stage(0)
     else:
-        env.set_level(1)
+        env.set_stage(1)
     # env.set_stage(1)
 
     obs = env.reset()

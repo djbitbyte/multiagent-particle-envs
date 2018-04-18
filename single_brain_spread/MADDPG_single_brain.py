@@ -95,9 +95,6 @@ class MADDPG:
         critics_grad = []
         actors_grad = []
 
-        index_obs = 0
-        index_act = 0
-
         transitions = self.memory.sample(self.batch_size)
         batch = Experience(*zip(*transitions))
         state_batch = Variable(th.stack(batch.states).type(FloatTensor))
@@ -141,16 +138,12 @@ class MADDPG:
 
         ##### actor network #####
         self.actor_optimizer.zero_grad()
-
-        idx = 0
-        actions_ls = []
-        for i in range(self.n_agents):
-            action_i = self.actor(state_batch[:, idx:(idx + self.dim_obs_list[i])])
-            actions_ls.append(action_i)
-            idx += self.dim_obs_list[i]
-
-        actions = th.cat(actions_ls, 1)
-        whole_action = actions.view(self.batch_size, -1)
+        pdb.set_trace()
+        state_i = state_batch[:, 0:self.dim_obs_list[0]]
+        action_i = self.actor(state_i)
+        ac = action_batch.clone()
+        ac[:, 0:self.dim_act_list[0]] = action_i
+        whole_action = ac.view(self.batch_size, -1)
 
         actor_loss = -self.critic(whole_state, whole_action)
         actor_loss = actor_loss.mean()

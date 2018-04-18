@@ -79,6 +79,7 @@ class Scenario(BaseScenario):
 
         if stage == 0:
             # squared distance and distance from listener to landmark
+            # a1 being trained of navigation, and a0 being trained of communication
             dist2 = np.sum(np.square(a0.goal_a.state.p_pos - a0.goal_b.state.p_pos))
             dist = np.sqrt(dist2)
             # decide reward here
