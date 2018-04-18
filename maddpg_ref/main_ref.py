@@ -60,6 +60,14 @@ for i_episode in range(n_episode):
         env.set_level(2)
     '''
     env.set_level(2)
+
+    # curriculum learning on agents task
+    if i_episode < 3000:
+        env.set_stage(0)
+    else:
+        env.set_level(1)
+    # env.set_stage(1)
+
     obs = env.reset()
     obs = np.concatenate(obs, 0)
     if isinstance(obs, np.ndarray):

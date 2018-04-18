@@ -15,6 +15,7 @@ class MultiAgentEnv(gym.Env):
                  done_callback=None, shared_viewer=True):
 
         self.level = 0
+        self.stage = 0
         self.world = world
         self.agents = self.world.policy_agents
         # set required vectorized gym env property
@@ -106,6 +107,9 @@ class MultiAgentEnv(gym.Env):
     def set_level(self, level):
         self.level = level
 
+    def set_stage(self, stage):
+        self.stage = stage
+
     def _reset(self):
         # reset world
         self.reset_callback(self.world, level=self.level)
@@ -140,7 +144,7 @@ class MultiAgentEnv(gym.Env):
     def _get_reward(self, agent):
         if self.reward_callback is None:
             return 0.0
-        return self.reward_callback(agent, self.world)
+        return self.reward_callback(agent, self.world, stage=self.stage)
 
     # set env action for a particular agent
     def _set_action(self, action, agent, action_space, time=None):
@@ -203,7 +207,6 @@ class MultiAgentEnv(gym.Env):
 
     # render environment
     def _render(self, mode='human', close=True):
-        '''
         if mode == 'human':
             alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
             message = ''
@@ -217,7 +220,6 @@ class MultiAgentEnv(gym.Env):
                         word = alphabet[np.argmax(other.state.c)]
                     message += (other.name + ' to ' + agent.name + ': ' + word + '   ')
             print(message)
-            '''
 
         if close:
             # close any existic renderers
