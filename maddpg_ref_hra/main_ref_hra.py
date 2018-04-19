@@ -15,16 +15,20 @@ n_agents = len(env.world.agents)
 dim_obs_list = [env.observation_space[i].shape[0] for i in range(n_agents)]
 
 dim_act_list = []
+dim_act_u = []
+dim_act_c = []
 for i in range(n_agents):
     if isinstance(env.action_space[i], spaces.MultiDiscrete):
         size = env.action_space[i].high - env.action_space[i].low + 1
+        dim_act_u.append(size[0])
+        dim_act_c.append(size[1])
         dim_act_list.append(sum(size))
     elif isinstance(env.action_space[i], spaces.Discrete):
         dim_act_list.append(env.action_space[i].n)
     else:
         print(env.action_space[i])
 
-capacity = 1000000
+capacity = 30000    # 1000000
 batch_size = 1024  # 1024
 
 n_episode = 100000    # 20000
@@ -32,12 +36,14 @@ max_steps = 30    # 35
 episodes_before_train = 50     # 50 ? Not specified in paper
 
 snapshot_path = "/home/jadeng/Documents/snapshot/ref_hra/"
-snapshot_name = "reference_latest_episode_"
+snapshot_name = "ref_hra_latest_episode_"
 path = snapshot_path + snapshot_name + '800'
 
 maddpg = MADDPG(n_agents,
                 dim_obs_list,
                 dim_act_list,
+                dim_act_u,
+                dim_act_c,
                 batch_size,
                 capacity,
                 episodes_before_train,
@@ -50,7 +56,10 @@ writer = SummaryWriter()
 
 for i_episode in range(n_episode):
     # pdb.set_trace()
-    obs = env.reset(2)
+    env.set_level(2)    # target randomized from 3 landmarks
+    env.set_stage(2)    # using de-composite reward
+
+    obs = env.reset()
     obs = np.concatenate(obs, 0)
     if isinstance(obs, np.ndarray):
         obs = th.FloatTensor(obs).type(FloatTensor)    # obs in Tensor
@@ -58,7 +67,8 @@ for i_episode in range(n_episode):
     total_reward = 0.0
 
     av_critics_grad = np.zeros((n_agents, 6))
-    av_actors_grad = np.zeros((n_agents, 6))
+    av_actorsU_grad = np.zeros((n_agents, 6))
+    av_actorsC_grad = np.zeros((n_agents, 6))
     n = 0
     print('Simple Reference')
     print('Start of episode', i_episode)
@@ -96,16 +106,18 @@ for i_episode in range(n_episode):
 
         obs = obs_
 
-        critics_grad, actors_grad = maddpg.update_policy()
+        critics_grad, actorsU_grad, actorsC_grad = maddpg.update_policy()
 
         if maddpg.episode_done > maddpg.episodes_before_train:
             av_critics_grad += np.array(critics_grad)
-            av_actors_grad += np.array(actors_grad)
+            av_actorsU_grad += np.array(actorsU_grad)
+            av_actorsC_grad += np.array(actorsC_grad)
             n += 1
 
     if n != 0:
         av_critics_grad = av_critics_grad / n
-        av_actors_grad = av_actors_grad / n
+        av_actorsU_grad = av_actorsU_grad / n
+        av_actorsC_grad = av_actorsC_grad / n
 
     maddpg.episode_done += 1
     mean_reward = total_reward / max_steps
@@ -118,20 +130,28 @@ for i_episode in range(n_episode):
     for i in range(6):
         writer.add_scalar('data/agent0_critic_gradient', av_critics_grad[0][i], i_episode)
 
-    # plot of agent0 - speaker gradient of actor net
+    # plot of agent0 - speaker gradient of actorU net
     for i in range(6):
-        writer.add_scalar('data/agent0_actor_gradient', av_actors_grad[0][i], i_episode)
+        writer.add_scalar('data/agent0_actorU_gradient', av_actorsU_grad[0][i], i_episode)
+
+    # plot of agent0 - speaker gradient of actorC net
+    for i in range(6):
+        writer.add_scalar('data/agent0_actorC_gradient', av_actorsC_grad[0][i], i_episode)
 
     # plot of agent1 - listener gradient of critics net
     for i in range(6):
         writer.add_scalar('data/agent1_critic_gradient', av_critics_grad[1][i], i_episode)
 
-    # plot of agent1 - speaker gradient of critics net
+    # plot of agent1 - listener gradient of actorU net
     for i in range(6):
-        writer.add_scalar('data/agent1_actor_gradient', av_actors_grad[1][i], i_episode)
+        writer.add_scalar('data/agent1_actorU_gradient', av_actorsU_grad[1][i], i_episode)
 
-    # to save models every 200 episodes
-    if i_episode != 0 and i_episode % 200 == 0:
+    # plot of agent1 - listener gradient of actorC net
+    for i in range(6):
+        writer.add_scalar('data/agent1_actorC_gradient', av_actorsC_grad[1][i], i_episode)
+
+    # to save models every 500 episodes
+    if i_episode != 0 and i_episode % 500 == 0:
         print('Save models!')
         if maddpg.action_noise == "OU_noise":
             states = {'critics': maddpg.critics,
@@ -140,17 +160,18 @@ for i_episode in range(n_episode):
                       'actor_optimizer': maddpg.actor_optimizer,
                       'critics_target': maddpg.critics_target,
                       'actors_target': maddpg.actors_target,
-                      'memory': maddpg.memory,
                       'var': maddpg.var,
                       'ou_prevs': [ou_noise.x_prev for ou_noise in maddpg.ou_noises]}
         else:
             states = {'critics': maddpg.critics,
-                      'actors': maddpg.actors,
+                      'actorsU': maddpg.actorsU,
+                      'actorsC': maddpg.actorsC,
                       'critic_optimizer': maddpg.critic_optimizer,
-                      'actor_optimizer': maddpg.actor_optimizer,
+                      'actorU_optimizer': maddpg.actorU_optimizer,
+                      'actorC_optimizer': maddpg.actorC_optimizer,
                       'critics_target': maddpg.critics_target,
-                      'actors_target': maddpg.actors_target,
-                      'memory': maddpg.memory,
+                      'actorsU_target': maddpg.actorsU_target,
+                      'actorsC_target': maddpg.actorsC_target,
                       'var': maddpg.var}
         th.save(states, snapshot_path + snapshot_name + str(i_episode))
 

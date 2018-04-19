@@ -95,6 +95,29 @@ class Scenario(BaseScenario):
             r1 = -dist2_1 - dist_1
             # decide reward here
             r = (r0 + r1) / 2
+
+        # Block for de-composite reward
+        else:
+            if agent is a0:
+                # reward for physical action
+                dist2_u = np.sum(np.square(a1.goal_a.state.p_pos - a1.goal_b.state.p_pos))
+                dist_u = np.sqrt(dist2_u)
+                r_u = -dist2_u - dist_u
+                # reward for communication action
+                dist2_c = np.sum(np.square(a0.goal_a.state.p_pos - a0.goal_b.state.p_pos))
+                dist_c = np.sqrt(dist2_c)
+                r_c = -dist2_c - dist_c
+            else:  # agent is a1
+                # reward for physical action
+                dist2_u = np.sum(np.square(a0.goal_a.state.p_pos - a0.goal_b.state.p_pos))
+                dist_u = np.sqrt(dist2_u)
+                r_u = -dist2_u - dist_u
+                # reward for communication action
+                dist2_c = np.sum(np.square(a1.goal_a.state.p_pos - a1.goal_b.state.p_pos))
+                dist_c = np.sqrt(dist2_c)
+                r_c = -dist2_c - dist_c
+            r = [r_u, r_c]
+
         return r  # -dist2  # np.exp(-dist2)
 
     def observation(self, agent, world):

@@ -26,28 +26,35 @@ def gumbel_softmax(ret, dim_action, temp=1):
     return F.softmax(ret/temp)
 
 
-class Actor(nn.Module):
-    def __init__(self, dim_observation, dim_action):
-        self.dim_action = dim_action
-        super(Actor, self).__init__()
+class ActorU(nn.Module):
+    def __init__(self, dim_observation, dim_action_u):
+        self.dim_action_u = dim_action_u
+        super(ActorU, self).__init__()
         self.FC1 = nn.Linear(dim_observation, nodes)
         self.FC2 = nn.Linear(nodes, nodes)
-        self.FC3 = nn.Linear(nodes, dim_action)
+        self.FC3 = nn.Linear(nodes, dim_action_u)
 
     def forward(self, obs):
         result = F.relu(self.FC1(obs))
         result = F.relu(self.FC2(result))
         result = self.FC3(result)
-        # gumbel_softmax for comm action and tanh for physical action
-        if self.dim_action == 3:
-            result = gumbel_softmax(result, self.dim_action)
-        elif self.dim_action == 5:
-            result = F.tanh(result)
-        elif self.dim_action == 8:   # action space with physical & comm action
-            result_u = F.tanh(result[:, :5])
-            result_c = gumbel_softmax(result[:, 5:], 3)
-            result = th.cat((result_u, result_c), 1)
-        # result = gumbel_softmax(result, self.dim_action)
+        result = F.tanh(result)     # tanh for physical action
+        return result
+
+
+class ActorC(nn.Module):
+    def __init__(self, dim_observation, dim_action_c):
+        self.dim_action_c = dim_action_c
+        super(ActorC, self).__init__()
+        self.FC1 = nn.Linear(dim_observation, nodes)
+        self.FC2 = nn.Linear(nodes, nodes)
+        self.FC3 = nn.Linear(nodes, dim_action_c)
+
+    def forward(self, obs):
+        result = F.relu(self.FC1(obs))
+        result = F.relu(self.FC2(result))
+        result = self.FC3(result)
+        result = gumbel_softmax(result, self.dim_action_c)    # gumbel_softmax for comm action
         return result
 
 

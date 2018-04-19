@@ -1,5 +1,5 @@
 from OrnsteinUhlenbeckActionNoise import OrnsteinUhlenbeckActionNoise as ou
-from models_hra import Critic, Actor
+from models_hra import Critic, ActorU, ActorC
 import torch as th
 from copy import deepcopy
 from memory import ReplayMemory, Experience
@@ -27,6 +27,8 @@ class MADDPG:
                  n_agents,
                  dim_obs_list,
                  dim_act_list,
+                 dim_act_u,
+                 dim_act_c,
                  batch_size,
                  capacity,
                  episodes_before_train,
@@ -36,13 +38,15 @@ class MADDPG:
         dim_act_sum = sum(dim_act_list)
 
         if load_models is None:
-            self.actors = [Actor(dim_obs, dim_act) for (dim_obs, dim_act) in zip(dim_obs_list, dim_act_list)]
+            self.actorsU = [ActorU(dim_obs, dim_act) for (dim_obs, dim_act) in zip(dim_obs_list, dim_act_u)]
+            self.actorsC = [ActorC(dim_obs, dim_act) for (dim_obs, dim_act) in zip(dim_obs_list, dim_act_c)]
             self.critics = [Critic(dim_obs_sum, dim_act_sum) for i in range(n_agents)]
-            self.actors_target = deepcopy(self.actors)
+            self.actorsU_target = deepcopy(self.actorsU)
+            self.actorsC_target = deepcopy(self.actorsC)
             self.critics_target = deepcopy(self.critics)
             self.critic_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.critics]     # 0.01, 0.005
-            self.actor_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.actors]       # 0.01, 0.005
-            self.memory = ReplayMemory(capacity)
+            self.actorU_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.actorsU]     # 0.01, 0.005
+            self.actorC_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.actorsC]     # 0.01, 0.005
             self.var = [1.0 for i in range(n_agents)]
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i])) for i in range(n_agents)]
@@ -50,21 +54,26 @@ class MADDPG:
             print('Start loading models!')
             states = th.load(load_models)
             self.critics = states['critics']
-            self.actors = states['actors']
+            self.actorsU = states['actorsU']
+            self.actorsC = states['actorsC']
             self.critic_optimizer = states['critic_optimizer']
-            self.actor_optimizer = states['actor_optimizer']
+            self.actorU_optimizer = states['actorU_optimizer']
+            self.actorC_optimizer = states['actorC_optimizer']
             self.critics_target = states['critics_target']
-            self.actors_target = states['actors_target']
-            self.memory = states['memory']
+            self.actorsU_target = states['actorsU_target']
+            self.actorsC_target = states['actorsC_target']
             self.var = states['var']
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i]), x0=states['ou_prevs'][i]) for i in range(n_agents)]
             print('Models loaded!')
 
+        self.memory = ReplayMemory(capacity)
         self.n_agents = n_agents
         self.batch_size = batch_size
         self.dim_obs_list = dim_obs_list
         self.dim_act_list = dim_act_list
+        self.dim_act_u = dim_act_u
+        self.dim_act_c = dim_act_c
         self.dim_obs_sum = dim_obs_sum
         self.dim_act_sum = dim_act_sum
         self.use_cuda = th.cuda.is_available()
@@ -77,11 +86,15 @@ class MADDPG:
         self.scale_reward = 0.01
 
         if self.use_cuda:
-            for x in self.actors:
+            for x in self.actorsU:
+                x.cuda()
+            for x in self.actorsC:
                 x.cuda()
             for x in self.critics:
                 x.cuda()
-            for x in self.actors_target:
+            for x in self.actorsU_target:
+                x.cuda()
+            for x in self.actorsC_target:
                 x.cuda()
             for x in self.critics_target:
                 x.cuda()
@@ -91,7 +104,7 @@ class MADDPG:
 
     def update_policy(self):
         if self.episode_done <= self.episodes_before_train:
-            return None, None
+            return None, None, None
 
         FloatTensor = th.cuda.FloatTensor if self.use_cuda else th.FloatTensor
 
@@ -99,7 +112,8 @@ class MADDPG:
         a_loss = []
 
         critics_grad = []
-        actors_grad = []
+        actorsU_grad = []
+        actorsC_grad = []
 
         index_obs = 0
         index_act = 0
@@ -123,7 +137,9 @@ class MADDPG:
             idx = 0
             next_actions_ls = []
             for i in range(self.n_agents):
-                next_action_i = self.actors_target[i](next_states_batch[:, idx:(idx + self.dim_obs_list[i])])
+                next_actionU_i = self.actorsU_target[i](next_states_batch[:, idx:(idx + self.dim_obs_list[i])])
+                next_actionC_i = self.actorsC_target[i](next_states_batch[:, idx:(idx + self.dim_obs_list[i])])
+                next_action_i = th.cat((next_actionU_i, next_actionC_i), 1)
                 next_actions_ls.append(next_action_i)
                 idx += self.dim_obs_list[i]
 
@@ -137,7 +153,6 @@ class MADDPG:
             # here target_Q is y_i of TD error equation
             # target_Q = (target_Q * self.GAMMA) + (reward_batch[:, agent] * self.scale_reward)
             target_Q = target_Q * self.GAMMA + reward_batch[:, agent, :]
-
             loss_Q = nn.MSELoss()(current_Q, target_Q.detach())
             loss_Q.backward()
 
@@ -146,10 +161,13 @@ class MADDPG:
             self.critic_optimizer[agent].step()
 
             ##### actor network #####
-            self.actor_optimizer[agent].zero_grad()
+            self.actorU_optimizer[agent].zero_grad()
+            self.actorC_optimizer[agent].zero_grad()
             state_i = state_batch[:, index_obs:(index_obs+self.dim_obs_list[agent])]
             index_obs += self.dim_obs_list[agent]
-            action_i = self.actors[agent](state_i)
+            actionU_i = self.actorsU[agent](state_i)
+            actionC_i = self.actorsC[agent](state_i)
+            action_i = th.cat((actionU_i, actionC_i), 1)
             ac = action_batch.clone()
             ac[:, index_act:(index_act+self.dim_act_list[agent])] = action_i
             whole_action = ac.view(self.batch_size, -1)
@@ -159,13 +177,17 @@ class MADDPG:
             actor_loss = -self.critics[agent](whole_state, whole_action)
 
             # update actor network from gradients of physical and comm loss
-            for i in range(len(actor_loss[0])):
-                loss = actor_loss[:, i].mean()
-                loss.backward(retain_graph=True)
+            loss_u = actor_loss[:, 0].mean()
+            loss_u.backward(retain_graph=True)
+            if self.clip is not None:
+                nn.utils.clip_grad_norm(self.actorsU[agent].parameters(), self.clip)
+            self.actorU_optimizer[agent].step()
 
-                if self.clip is not None:
-                    nn.utils.clip_grad_norm(self.actors[agent].parameters(), self.clip)
-                self.actor_optimizer[agent].step()
+            loss_c = actor_loss[:, 1].mean()
+            loss_c.backward()
+            if self.clip is not None:
+                nn.utils.clip_grad_norm(self.actorsC[agent].parameters(), self.clip)
+            self.actorC_optimizer[agent].step()
 
             '''
             # update actor network from gradients of physical and comm loss
@@ -193,24 +215,30 @@ class MADDPG:
             a_loss.append(actor_loss)
 
             critics_agent_grad = []
-            actors_agent_grad = []
+            actorsU_agent_grad = []
+            actorsC_agent_grad = []
             for x in self.critics[agent].parameters():
                 critics_agent_grad.append(x.grad.data.norm(2))
                 # critics_agent_grad.append(th.mean(x.grad).data[0])
-            for x in self.actors[agent].parameters():
-                actors_agent_grad.append(x.grad.data.norm(2))
-                # actors_agent_grad.append(th.mean(x.grad).data[0])
+            for x in self.actorsU[agent].parameters():
+                actorsU_agent_grad.append(x.grad.data.norm(2))
+                # actorsU_agent_grad.append(th.mean(x.grad).data[0])
+            for x in self.actorsC[agent].parameters():
+                actorsC_agent_grad.append(x.grad.data.norm(2))
+                # actorsC_agent_grad.append(th.mean(x.grad).data[0])
 
             critics_grad.append(critics_agent_grad)
-            actors_grad.append(actors_agent_grad)
+            actorsU_grad.append(actorsU_agent_grad)
+            actorsC_grad.append(actorsC_agent_grad)
 
         # update of target network
         if self.steps_done % 100 == 0 and self.steps_done > 0:
             for i in range(self.n_agents):
                 soft_update(self.critics_target[i], self.critics[i], self.tau)
-                soft_update(self.actors_target[i], self.actors[i], self.tau)
+                soft_update(self.actorsU_target[i], self.actorsU[i], self.tau)
+                soft_update(self.actorsC_target[i], self.actorsC[i], self.tau)
 
-        return critics_grad, actors_grad
+        return critics_grad, actorsU_grad, actorsC_grad
 
     def select_action(self, obs):   # concatenation of observations from agents
         FloatTensor = th.cuda.FloatTensor if self.use_cuda else th.FloatTensor
@@ -224,7 +252,9 @@ class MADDPG:
         index_act = 0
         for i in range(self.n_agents):
             sb = obs[:, index_obs:(index_obs+self.dim_obs_list[i])]
-            act = self.actors[i](sb)
+            actU = self.actorsU[i](sb)
+            actC = self.actorsC[i](sb)
+            act = th.cat((actU, actC), 1)
             # act = act.view(self.dim_act_list[i])
 
             # add exploration noise of OU process or Gaussian
