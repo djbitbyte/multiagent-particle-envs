@@ -66,7 +66,8 @@ for i_episode in range(n_episode):
 
     total_reward = 0.0
 
-    av_critics_grad = np.zeros((n_agents, 6))
+    av_criticsU_grad = np.zeros((n_agents, 6))
+    av_criticsC_grad = np.zeros((n_agents, 6))
     av_actorsU_grad = np.zeros((n_agents, 6))
     av_actorsC_grad = np.zeros((n_agents, 6))
     n = 0
@@ -106,16 +107,18 @@ for i_episode in range(n_episode):
 
         obs = obs_
 
-        critics_grad, actorsU_grad, actorsC_grad = maddpg.update_policy()
+        criticsU_grad, criticsC_grad, actorsU_grad, actorsC_grad = maddpg.update_policy()
 
         if maddpg.episode_done > maddpg.episodes_before_train:
-            av_critics_grad += np.array(critics_grad)
+            av_criticsU_grad += np.array(criticsU_grad)
+            av_criticsC_grad += np.array(criticsC_grad)
             av_actorsU_grad += np.array(actorsU_grad)
             av_actorsC_grad += np.array(actorsC_grad)
             n += 1
 
     if n != 0:
-        av_critics_grad = av_critics_grad / n
+        av_criticsU_grad = av_criticsU_grad / n
+        av_criticsC_grad = av_criticsC_grad / n
         av_actorsU_grad = av_actorsU_grad / n
         av_actorsC_grad = av_actorsC_grad / n
 
@@ -128,7 +131,11 @@ for i_episode in range(n_episode):
 
     # plot of agent0 - speaker gradient of critic net
     for i in range(6):
-        writer.add_scalar('data/agent0_critic_gradient', av_critics_grad[0][i], i_episode)
+        writer.add_scalar('data/agent0_criticU_gradient', av_criticsU_grad[0][i], i_episode)
+
+    # plot of agent0 - speaker gradient of critic net
+    for i in range(6):
+        writer.add_scalar('data/agent0_criticC_gradient', av_criticsC_grad[0][i], i_episode)
 
     # plot of agent0 - speaker gradient of actorU net
     for i in range(6):
@@ -140,7 +147,11 @@ for i_episode in range(n_episode):
 
     # plot of agent1 - listener gradient of critics net
     for i in range(6):
-        writer.add_scalar('data/agent1_critic_gradient', av_critics_grad[1][i], i_episode)
+        writer.add_scalar('data/agent1_critic_gradient', av_criticsU_grad[1][i], i_episode)
+
+    # plot of agent1 - listener gradient of critics net
+    for i in range(6):
+        writer.add_scalar('data/agent1_critic_gradient', av_criticsC_grad[1][i], i_episode)
 
     # plot of agent1 - listener gradient of actorU net
     for i in range(6):
@@ -163,13 +174,16 @@ for i_episode in range(n_episode):
                       'var': maddpg.var,
                       'ou_prevs': [ou_noise.x_prev for ou_noise in maddpg.ou_noises]}
         else:
-            states = {'critics': maddpg.critics,
+            states = {'criticsU': maddpg.criticsU,
+                      'criticsC': maddpg.criticsC,
                       'actorsU': maddpg.actorsU,
                       'actorsC': maddpg.actorsC,
-                      'critic_optimizer': maddpg.critic_optimizer,
+                      'criticU_optimizer': maddpg.criticU_optimizer,
+                      'criticC_optimizer': maddpg.criticC_optimizer,
                       'actorU_optimizer': maddpg.actorU_optimizer,
                       'actorC_optimizer': maddpg.actorC_optimizer,
-                      'critics_target': maddpg.critics_target,
+                      'criticsU_target': maddpg.criticsU_target,
+                      'criticsC_target': maddpg.criticsC_target,
                       'actorsU_target': maddpg.actorsU_target,
                       'actorsC_target': maddpg.actorsC_target,
                       'var': maddpg.var}

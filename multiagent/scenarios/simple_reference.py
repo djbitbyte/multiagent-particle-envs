@@ -134,7 +134,7 @@ class Scenario(BaseScenario):
         if agent.goal_b is not None:
             goal_color[1] = agent.goal_b.color
 
-            # get positions of all entities in this agent's reference frame
+        # get positions of all entities in this agent's reference frame
         entity_pos = []
         for entity in world.landmarks:  # world.entities:
             entity_pos.append(entity.state.p_pos - agent.state.p_pos)

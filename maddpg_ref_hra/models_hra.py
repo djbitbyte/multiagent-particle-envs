@@ -65,7 +65,7 @@ class Critic(nn.Module):
         # self.FC2 = nn.Linear(64+dim_action, 64)
         self.FC1 = nn.Linear(dim_observation + dim_action, nodes)  # nn.Linear(obs_dim+act_dim, 64)
         self.FC2 = nn.Linear(nodes, nodes)
-        self.FC3 = nn.Linear(nodes, 2)
+        self.FC3 = nn.Linear(nodes, 1)
 
     def forward(self, obs, acts):
         # result = F.relu(self.FC1(obs))

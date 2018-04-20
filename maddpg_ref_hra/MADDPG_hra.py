@@ -40,26 +40,32 @@ class MADDPG:
         if load_models is None:
             self.actorsU = [ActorU(dim_obs, dim_act) for (dim_obs, dim_act) in zip(dim_obs_list, dim_act_u)]
             self.actorsC = [ActorC(dim_obs, dim_act) for (dim_obs, dim_act) in zip(dim_obs_list, dim_act_c)]
-            self.critics = [Critic(dim_obs_sum, dim_act_sum) for i in range(n_agents)]
+            self.criticsU = [Critic(dim_obs_sum, dim_act_sum) for i in range(n_agents)]
+            self.criticsC = [Critic(dim_obs_sum, dim_act_sum) for i in range(n_agents)]
             self.actorsU_target = deepcopy(self.actorsU)
             self.actorsC_target = deepcopy(self.actorsC)
-            self.critics_target = deepcopy(self.critics)
-            self.critic_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.critics]     # 0.01, 0.005
-            self.actorU_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.actorsU]     # 0.01, 0.005
-            self.actorC_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.actorsC]     # 0.01, 0.005
+            self.criticsU_target = deepcopy(self.criticsU)
+            self.criticsC_target = deepcopy(self.criticsC)
+            self.criticU_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.criticsU]   # 0.01, 0.005
+            self.criticC_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.criticsC]   # 0.01, 0.005
+            self.actorU_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.actorsU]     # 0.01, 0.005
+            self.actorC_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.actorsC]     # 0.01, 0.005
             self.var = [1.0 for i in range(n_agents)]
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i])) for i in range(n_agents)]
         else:
             print('Start loading models!')
             states = th.load(load_models)
-            self.critics = states['critics']
+            self.criticsU = states['criticsU']
+            self.criticsC = states['criticsC']
             self.actorsU = states['actorsU']
             self.actorsC = states['actorsC']
-            self.critic_optimizer = states['critic_optimizer']
+            self.criticU_optimizer = states['criticU_optimizer']
+            self.criticC_optimizer = states['criticC_optimizer']
             self.actorU_optimizer = states['actorU_optimizer']
             self.actorC_optimizer = states['actorC_optimizer']
-            self.critics_target = states['critics_target']
+            self.criticsU_target = states['criticsU_target']
+            self.criticsC_target = states['criticsC_target']
             self.actorsU_target = states['actorsU_target']
             self.actorsC_target = states['actorsC_target']
             self.var = states['var']
@@ -90,13 +96,17 @@ class MADDPG:
                 x.cuda()
             for x in self.actorsC:
                 x.cuda()
-            for x in self.critics:
+            for x in self.criticsU:
+                x.cuda()
+            for x in self.criticsC:
                 x.cuda()
             for x in self.actorsU_target:
                 x.cuda()
             for x in self.actorsC_target:
                 x.cuda()
-            for x in self.critics_target:
+            for x in self.criticsU_target:
+                x.cuda()
+            for x in self.criticsC_target:
                 x.cuda()
 
         self.steps_done = 0
@@ -104,14 +114,15 @@ class MADDPG:
 
     def update_policy(self):
         if self.episode_done <= self.episodes_before_train:
-            return None, None, None
+            return None, None, None, None
 
         FloatTensor = th.cuda.FloatTensor if self.use_cuda else th.FloatTensor
 
         c_loss = []
         a_loss = []
 
-        critics_grad = []
+        criticsU_grad = []
+        criticsC_grad = []
         actorsU_grad = []
         actorsC_grad = []
 
@@ -131,8 +142,10 @@ class MADDPG:
 
             # pdb.set_trace()
             ###### critic network #####
-            self.critic_optimizer[agent].zero_grad()
-            current_Q = self.critics[agent](whole_state, whole_action)
+            self.criticU_optimizer[agent].zero_grad()
+            self.criticC_optimizer[agent].zero_grad()
+            currentU_Q = self.criticsU[agent](whole_state, whole_action)
+            currentC_Q = self.criticsC[agent](whole_state, whole_action)
 
             idx = 0
             next_actions_ls = []
@@ -145,20 +158,29 @@ class MADDPG:
 
             next_actions = th.cat(next_actions_ls, 1)
             # pdb.set_trace()
-            target_Q = self.critics_target[agent](
+            targetU_Q = self.criticsU_target[agent](
+                next_states_batch.view(-1, self.dim_obs_sum),
+                next_actions.view(-1, self.dim_act_sum)
+            )
+            targetC_Q = self.criticsC_target[agent](
                 next_states_batch.view(-1, self.dim_obs_sum),
                 next_actions.view(-1, self.dim_act_sum)
             )
 
             # here target_Q is y_i of TD error equation
             # target_Q = (target_Q * self.GAMMA) + (reward_batch[:, agent] * self.scale_reward)
-            target_Q = target_Q * self.GAMMA + reward_batch[:, agent, :]
-            loss_Q = nn.MSELoss()(current_Q, target_Q.detach())
-            loss_Q.backward()
+            targetU_Q = targetU_Q * self.GAMMA + reward_batch[:, agent, :1]
+            targetC_Q = targetC_Q * self.GAMMA + reward_batch[:, agent, 1:]
+            lossU_Q = nn.MSELoss()(currentU_Q, targetU_Q.detach())
+            lossC_Q = nn.MSELoss()(currentC_Q, targetC_Q.detach())
+            lossU_Q.backward()
+            lossC_Q.backward()
 
             if self.clip is not None:
-                nn.utils.clip_grad_norm(self.critics[agent].parameters(), self.clip)
-            self.critic_optimizer[agent].step()
+                nn.utils.clip_grad_norm(self.criticsU[agent].parameters(), self.clip)
+                nn.utils.clip_grad_norm(self.criticsC[agent].parameters(), self.clip)
+            self.criticU_optimizer[agent].step()
+            self.criticC_optimizer[agent].step()
 
             ##### actor network #####
             self.actorU_optimizer[agent].zero_grad()
@@ -167,18 +189,25 @@ class MADDPG:
             index_obs += self.dim_obs_list[agent]
             actionU_i = self.actorsU[agent](state_i)
             actionC_i = self.actorsC[agent](state_i)
-            action_i = th.cat((actionU_i, actionC_i), 1)
-            ac = action_batch.clone()
-            ac[:, index_act:(index_act+self.dim_act_list[agent])] = action_i
-            whole_action = ac.view(self.batch_size, -1)
+            action_i_U = th.cat((actionU_i, actionC_i.detach()), 1)
+            action_i_C = th.cat((actionU_i.detach(), actionC_i), 1)
+            acU = action_batch.clone()
+            acC = action_batch.clone()
+            acU[:, index_act:(index_act + self.dim_act_list[agent])] = action_i_U
+            acC[:, index_act:(index_act + self.dim_act_list[agent])] = action_i_C
+            whole_actionU = acU.view(self.batch_size, -1)
+            whole_actionC = acC.view(self.batch_size, -1)
             index_act += self.dim_act_list[agent]
 
             # pdb.set_trace()
-            actor_loss = -self.critics[agent](whole_state, whole_action)
+            actorU_loss = -self.criticsU[agent](whole_state, whole_actionU)
+            actorC_loss = -self.criticsC[agent](whole_state, whole_actionC)
 
             # update actor networks
-            actor_loss = actor_loss.mean()
-            actor_loss.backward()
+            actorU_loss = actorU_loss.mean()
+            actorU_loss.backward()
+            actorC_loss = actorC_loss.mean()
+            actorC_loss.backward()
             if self.clip is not None:
                 nn.utils.clip_grad_norm(self.actorsU[agent].parameters(), self.clip)
                 nn.utils.clip_grad_norm(self.actorsC[agent].parameters(), self.clip)
@@ -198,14 +227,18 @@ class MADDPG:
             '''
 
             # for plotting
-            c_loss.append(loss_Q)
-            a_loss.append(actor_loss)
+            c_loss.append(lossU_Q)
+            a_loss.append(actorU_loss)
 
-            critics_agent_grad = []
+            criticsU_agent_grad = []
+            criticsC_agent_grad = []
             actorsU_agent_grad = []
             actorsC_agent_grad = []
-            for x in self.critics[agent].parameters():
-                critics_agent_grad.append(x.grad.data.norm(2))
+            for x in self.criticsU[agent].parameters():
+                criticsU_agent_grad.append(x.grad.data.norm(2))
+                # critics_agent_grad.append(th.mean(x.grad).data[0])
+            for x in self.criticsC[agent].parameters():
+                criticsC_agent_grad.append(x.grad.data.norm(2))
                 # critics_agent_grad.append(th.mean(x.grad).data[0])
             for x in self.actorsU[agent].parameters():
                 actorsU_agent_grad.append(x.grad.data.norm(2))
@@ -214,18 +247,20 @@ class MADDPG:
                 actorsC_agent_grad.append(x.grad.data.norm(2))
                 # actorsC_agent_grad.append(th.mean(x.grad).data[0])
 
-            critics_grad.append(critics_agent_grad)
+            criticsU_grad.append(criticsU_agent_grad)
+            criticsC_grad.append(criticsC_agent_grad)
             actorsU_grad.append(actorsU_agent_grad)
             actorsC_grad.append(actorsC_agent_grad)
 
         # update of target network
         if self.steps_done % 100 == 0 and self.steps_done > 0:
             for i in range(self.n_agents):
-                soft_update(self.critics_target[i], self.critics[i], self.tau)
+                soft_update(self.criticsU_target[i], self.criticsU[i], self.tau)
+                soft_update(self.criticsC_target[i], self.criticsC[i], self.tau)
                 soft_update(self.actorsU_target[i], self.actorsU[i], self.tau)
                 soft_update(self.actorsC_target[i], self.actorsC[i], self.tau)
 
-        return critics_grad, actorsU_grad, actorsC_grad
+        return criticsU_grad, criticsC_grad, actorsU_grad, actorsC_grad
 
     def select_action(self, obs):   # concatenation of observations from agents
         FloatTensor = th.cuda.FloatTensor if self.use_cuda else th.FloatTensor
