@@ -40,8 +40,8 @@ class MADDPG:
             self.critics = [Critic(dim_obs_sum, dim_act_sum) for i in range(n_agents)]
             self.actors_target = deepcopy(self.actors)
             self.critics_target = deepcopy(self.critics)
-            self.critic_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.critics]     # 0.01, 0.005
-            self.actor_optimizer = [Adam(x.parameters(), lr=0.0075) for x in self.actors]       # 0.01, 0.005
+            self.critic_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.critics]     # 0.01, 0.005
+            self.actor_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.actors]       # 0.01, 0.005
             self.var = [1.0 for i in range(n_agents)]
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i])) for i in range(n_agents)]

@@ -176,17 +176,13 @@ class MADDPG:
             # pdb.set_trace()
             actor_loss = -self.critics[agent](whole_state, whole_action)
 
-            # update actor network from gradients of physical and comm loss
-            loss_u = actor_loss[:, 0].mean()
-            loss_u.backward(retain_graph=True)
+            # update actor networks
+            actor_loss = actor_loss.mean()
+            actor_loss.backward()
             if self.clip is not None:
                 nn.utils.clip_grad_norm(self.actorsU[agent].parameters(), self.clip)
-            self.actorU_optimizer[agent].step()
-
-            loss_c = actor_loss[:, 1].mean()
-            loss_c.backward()
-            if self.clip is not None:
                 nn.utils.clip_grad_norm(self.actorsC[agent].parameters(), self.clip)
+            self.actorU_optimizer[agent].step()
             self.actorC_optimizer[agent].step()
 
             '''
@@ -194,16 +190,7 @@ class MADDPG:
             loss = []
             for i in range(len(actor_loss[0])):
                 loss.append(actor_loss[:, i].mean())
-            loss.backward(loss)
-
-            if self.clip is not None:
-                nn.utils.clip_grad_norm(self.actors[agent].parameters(), self.clip)
-            self.actor_optimizer[agent].step()
-            '''
-
-            '''
-            actor_loss = actor_loss.mean()
-            actor_loss.backward()
+            loss.backward(loss)     # wrong one
 
             if self.clip is not None:
                 nn.utils.clip_grad_norm(self.actors[agent].parameters(), self.clip)
