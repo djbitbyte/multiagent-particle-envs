@@ -27,7 +27,7 @@ for i in range(n_agents):
 capacity = 30000
 batch_size = 1024  # 1024
 
-n_episode = 100000    # 20000
+n_episode = 200000    # 20000
 max_steps = 30    # 35
 episodes_before_train = 50     # 50 ? Not specified in paper
 
@@ -61,12 +61,25 @@ for i_episode in range(n_episode):
     '''
     env.set_level(2)
 
+    '''
     # curriculum learning on agents task
     if i_episode < 10000:
         env.set_stage(0)
     else:
         env.set_stage(1)
-    # env.set_stage(1)
+    '''
+    env.set_stage(1)
+
+    # curriculum learning on agents observation
+    if i_episode < 3000:
+        env.set_obs(0)
+    elif 3000 <= i_episode < 8000:
+        env.set_obs(1)
+    else:
+        env.set_obs(2)
+    '''
+    env.set_obs(2)
+    '''
 
     obs = env.reset()
     obs = np.concatenate(obs, 0)

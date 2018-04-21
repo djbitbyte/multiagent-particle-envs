@@ -31,7 +31,7 @@ for i in range(n_agents):
 capacity = 30000    # 1000000
 batch_size = 1024  # 1024
 
-n_episode = 100000    # 20000
+n_episode = 200000    # 20000
 max_steps = 30    # 35
 episodes_before_train = 50     # 50 ? Not specified in paper
 

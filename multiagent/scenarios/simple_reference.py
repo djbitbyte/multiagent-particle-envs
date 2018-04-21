@@ -120,7 +120,7 @@ class Scenario(BaseScenario):
 
         return r  # -dist2  # np.exp(-dist2)
 
-    def observation(self, agent, world):
+    def observation(self, agent, world, obs=0):
         # goal positions
         # goal_pos = [np.zeros(world.dim_p), np.zeros(world.dim_p)]
         # if agent.goal_a is not None:
@@ -142,9 +142,43 @@ class Scenario(BaseScenario):
         entity_color = []
         for entity in world.landmarks:  # world.entities:
             entity_color.append(entity.color)
+
         # communication of all other agents
         comm = []
-        for other in world.agents:
-            if other is agent: continue
-            comm.append(other.state.c)
+        com = np.zeros(world.dim_c)
+
+        if obs == 0:
+            if agent == world.agents[0]:
+                com[np.argmax(world.agents[1].goal_b.color)] = 1.0
+                comm.append(com)
+            else:
+                com[np.argmax(world.agents[0].goal_b.color)] = 1.0
+                comm.append(com)
+
+        elif obs == 1:
+            if agent == world.agents[0]:
+                com[np.argmax(world.agents[1].goal_b.color)] = 1.0
+                comm.append(com)
+            else:
+                comm.append(world.agents[0].state.c)
+
+        else:
+            for other in world.agents:
+                if other is agent: continue
+                comm.append(other.state.c)
+
         return np.concatenate([agent.state.p_vel] + entity_pos + [goal_color[1]] + comm)
+
+
+
+
+'''
+            for other in world.agents:
+                if agent == world.agents[0]:
+                    if other is agent: continue
+                    com[np.argmax(other.goal_b.color)] = 1.0
+                    comm.append(com)
+                else:
+                    if other is agent: continue
+                    comm.append(other.state.c)
+            '''

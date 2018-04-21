@@ -16,6 +16,7 @@ class MultiAgentEnv(gym.Env):
 
         self.level = 0
         self.stage = 0
+        self.obs = 0
         self.world = world
         self.agents = self.world.policy_agents
         # set required vectorized gym env property
@@ -110,6 +111,9 @@ class MultiAgentEnv(gym.Env):
     def set_stage(self, stage):
         self.stage = stage
 
+    def set_obs(self, obs):
+        self.obs = obs
+
     def _reset(self):
         # reset world
         self.reset_callback(self.world, level=self.level)
@@ -132,7 +136,7 @@ class MultiAgentEnv(gym.Env):
     def _get_obs(self, agent):
         if self.observation_callback is None:
             return np.zeros(0)
-        return self.observation_callback(agent, self.world)
+        return self.observation_callback(agent, self.world, obs=self.obs)
 
     # get dones for a particular agent
     def _get_done(self, agent):
