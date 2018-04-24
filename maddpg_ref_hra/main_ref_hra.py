@@ -58,6 +58,7 @@ for i_episode in range(n_episode):
     # pdb.set_trace()
     env.set_level(2)    # target randomized from 3 landmarks
     env.set_stage(2)    # using de-composite reward
+    env.set_obs(2)
 
     obs = env.reset()
     obs = np.concatenate(obs, 0)

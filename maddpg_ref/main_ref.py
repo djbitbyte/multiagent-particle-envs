@@ -71,9 +71,9 @@ for i_episode in range(n_episode):
     env.set_stage(1)
 
     # curriculum learning on agents observation
-    if i_episode < 3000:
+    if i_episode < 5000:
         env.set_obs(0)
-    elif 3000 <= i_episode < 8000:
+    elif 5000 <= i_episode < 15000:
         env.set_obs(1)
     else:
         env.set_obs(2)
