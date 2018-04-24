@@ -12,7 +12,7 @@ class MultiAgentEnv(gym.Env):
 
     def __init__(self, world, reset_callback=None, reward_callback=None,
                  observation_callback=None, info_callback=None,
-                 done_callback=None, shared_viewer=True,
+                 done_callback=None, shared_viewer=True, 
                  print_communication=False, print_action=False):
 
         self.level = 0

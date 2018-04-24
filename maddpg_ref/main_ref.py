@@ -37,7 +37,8 @@ print_action = args.print_action
 print_communication = args.print_communication
 
 # make environment
-env = make_env('simple_reference')
+env = make_env('simple_reference', 
+    print_action=print_action, print_communication=print_communication)
 n_agents = len(env.world.agents)
 dim_obs_list = [env.observation_space[i].shape[0] for i in range(n_agents)]
 
