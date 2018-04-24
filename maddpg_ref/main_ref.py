@@ -2,6 +2,7 @@ from torch.autograd import Variable
 from make_env import make_env
 from gym import spaces
 from MADDPG import MADDPG
+import argparse
 import numpy as np
 import torch as th
 from tensorboardX import SummaryWriter
@@ -10,6 +11,32 @@ import time
 import pdb
 
 
+# argument parser
+parser = argparse.ArgumentParser()
+parser.add_argument("--consistency_interval", type=int, default=10,
+                    help="Number of episodes to tally communications stats over")
+parser.add_argument("-l", "--load", type=str, default=None,
+                    help="Path to model to load")
+parser.add_argument("--snapshot_interval", type=int, default=500,
+                    help="Episodes between model snapshots")
+parser.add_argument("--snapshot_path", type=str, default="/home/jadeng/Documents/snapshot/ref/",
+                    help="Path to output model snapshots")
+parser.add_argument("--snapshot_prefix", type=str, default="reference_latest_episode_",
+                    help="Filename prefix of model snapshots")
+parser.add_argument("--print_action", action="store_true")
+parser.add_argument("--print_communication", action="store_true")
+
+args = parser.parse_args()
+
+snapshot_interval = args.snapshot_interval
+snapshot_path = args.snapshot_path
+snapshot_prefix = args.snapshot_prefix
+load_model = args.load
+consistency_interval = args.consistency_interval
+print_action = args.print_action
+print_communication = args.print_communication
+
+# make environment
 env = make_env('simple_reference')
 n_agents = len(env.world.agents)
 dim_obs_list = [env.observation_space[i].shape[0] for i in range(n_agents)]
@@ -30,10 +57,6 @@ batch_size = 1024  # 1024
 n_episode = 200000    # 20000
 max_steps = 30    # 35
 episodes_before_train = 50     # 50 ? Not specified in paper
-
-snapshot_path = "/home/jadeng/Documents/snapshot/ref/"
-snapshot_name = "reference_latest_episode_"
-path = snapshot_path + snapshot_name + '800'
 
 maddpg = MADDPG(n_agents,
                 dim_obs_list,
@@ -70,16 +93,16 @@ for i_episode in range(n_episode):
     '''
     env.set_stage(1)
 
+    '''
     # curriculum learning on agents observation
-    if i_episode < 5000:
+    if i_episode < 3000:
         env.set_obs(0)
-    elif 5000 <= i_episode < 15000:
+    elif 3000 <= i_episode < 7000:
         env.set_obs(1)
     else:
         env.set_obs(2)
     '''
     env.set_obs(2)
-    '''
 
     obs = env.reset()
     obs = np.concatenate(obs, 0)
@@ -97,6 +120,11 @@ for i_episode in range(n_episode):
           .format(env.world.agents[1].goal_b.name, env.world.agents[1].goal_b.color))
     print("Target landmark for agent 1: {}, Target landmark color: {}"
           .format(env.world.agents[0].goal_b.name, env.world.agents[0].goal_b.color))
+
+    if (i_episode % consistency_interval) == 0:
+        communication_mappings = np.zeros((n_agents, 3, 3))
+    episode_communications = np.zeros((n_agents, 3))
+
     for t in range(max_steps):
         env.render()
         # time.sleep(0.05)
@@ -119,6 +147,11 @@ for i_episode in range(n_episode):
         total_reward += sum(reward)
         reward = th.FloatTensor(reward).type(FloatTensor)
 
+        comm_1 = action_np[5: 8].argmax()
+        comm_2 = action_np[13: 16].argmax()
+        episode_communications[0, comm_1] += 1
+        episode_communications[1, comm_2] += 1
+
         obs_ = np.concatenate(obs_, 0)
         obs_ = th.FloatTensor(obs_).type(FloatTensor)
 
@@ -132,6 +165,26 @@ for i_episode in range(n_episode):
             av_critics_grad += np.array(critics_grad)
             av_actors_grad += np.array(actors_grad)
             n += 1
+
+    for agent_i in range(n_agents):
+        for goal_i in range(3):
+            if env.world.agents[agent_i].goal_b == env.world.landmarks[goal_i]:
+                communication_mappings[agent_i, goal_i, :] += episode_communications[agent_i, :]
+
+    if (i_episode % consistency_interval) == consistency_interval - 1:
+        for agent_i in range(n_agents):
+            string = "Agent {}: ".format(agent_i)
+            normalized_agent_mapping = communication_mappings[agent_i, :, :] / np.expand_dims(
+                communication_mappings[agent_i, :, :].sum(1), 1)
+            writer.add_scalar('communication/agent{}_det'.format(agent_i),
+                              np.linalg.det(normalized_agent_mapping),
+                              i_episode)
+            for goal_i in range(3):
+                mapping = communication_mappings[agent_i, goal_i, :]
+                consistency = 0 if mapping.sum() == 0 else mapping.max() / mapping.sum()
+                writer.add_scalar('consistency/agent{}_goal{}'.format(agent_i, goal_i), consistency, i_episode)
+                string += ("{:.1f}% ".format(consistency * 100))
+            print(string)
 
     if n != 0:
         av_critics_grad = av_critics_grad / n
@@ -160,8 +213,8 @@ for i_episode in range(n_episode):
     for i in range(6):
         writer.add_scalar('data/agent1_actor_gradient', av_actors_grad[1][i], i_episode)
 
-    # to save models every 500 episodes
-    if i_episode != 0 and i_episode % 500 == 0:
+    # to save models every N episodes
+    if i_episode != 0 and i_episode % snapshot_interval == 0:
         print('Save models!')
         if maddpg.action_noise == "OU_noise":
             states = {'critics': maddpg.critics,
@@ -180,7 +233,7 @@ for i_episode in range(n_episode):
                       'critics_target': maddpg.critics_target,
                       'actors_target': maddpg.actors_target,
                       'var': maddpg.var}
-        th.save(states, snapshot_path + snapshot_name + str(i_episode))
+        th.save(states, snapshot_path + snapshot_prefix + str(i_episode))
 
 writer.export_scalars_to_json("./all_scalars.json")
 writer.close()

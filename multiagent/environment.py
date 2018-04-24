@@ -12,7 +12,8 @@ class MultiAgentEnv(gym.Env):
 
     def __init__(self, world, reset_callback=None, reward_callback=None,
                  observation_callback=None, info_callback=None,
-                 done_callback=None, shared_viewer=True):
+                 done_callback=None, shared_viewer=True,
+                 print_communication=False, print_action=False):
 
         self.level = 0
         self.stage = 0
@@ -36,6 +37,10 @@ class MultiAgentEnv(gym.Env):
         # if true, every agent has the same reward
         self.shared_reward = False
         self.time = 0
+
+        # Debug options
+        self.print_communication = print_communication
+        self.print_action = print_action
 
         # configure spaces
         self.action_space = []
@@ -86,8 +91,13 @@ class MultiAgentEnv(gym.Env):
         info_n = {'n': []}
         self.agents = self.world.policy_agents
         # set action for each agent
+        actionstr = ""
         for i, agent in enumerate(self.agents):
             self._set_action(action_n[i], agent, self.action_space[i])
+            actionstr += str(i) + ":\t {:.2f} {:.2f}".format(agent.action.u[0], agent.action.u[1])
+        if self.print_action:
+            print(actionstr)
+
         # advance world state
         self.world.step()
         # record observation for each agent
@@ -224,7 +234,8 @@ class MultiAgentEnv(gym.Env):
                     else:
                         word = alphabet[np.argmax(other.state.c)]
                     message += (other.name + ' to ' + agent.name + ': ' + word + '   ')
-            print(message)
+            if self.print_communication:
+                print(message)
 
 
         if close:
