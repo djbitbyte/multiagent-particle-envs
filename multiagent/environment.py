@@ -97,7 +97,7 @@ class MultiAgentEnv(gym.Env):
             actionstr += str(i) + ":\t {:.2f} {:.2f}".format(agent.action.u[0], agent.action.u[1])
         if self.print_action:
             print(actionstr)
-
+        
         # advance world state
         self.world.step()
         # record observation for each agent

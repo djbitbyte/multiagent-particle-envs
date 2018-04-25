@@ -59,10 +59,6 @@ n_episode = 200000    # 20000
 max_steps = 30    # 35
 episodes_before_train = 50     # 50 ? Not specified in paper
 
-snapshot_path = "/home/jadeng/Documents/snapshot/ref/"
-snapshot_name = "reference_latest_episode_"
-path = snapshot_path + snapshot_name + '800'
-
 maddpg = MADDPG(n_agents,
                 dim_obs_list,
                 dim_act_list,
@@ -70,14 +66,13 @@ maddpg = MADDPG(n_agents,
                 capacity,
                 episodes_before_train,
                 action_noise="Gaussian_noise",  # ou_noises
-                load_models=None)               # path
+                load_models=load_models)        # path
 
 FloatTensor = th.cuda.FloatTensor if maddpg.use_cuda else th.FloatTensor
 
 writer = SummaryWriter()
 
 for i_episode in range(n_episode):
-    # pdb.set_trace()
     '''
     # curriculum learning
     if i_episode < 1000:
@@ -136,7 +131,6 @@ for i_episode in range(n_episode):
 
         # obs Tensor turns into Variable before feed into Actor
         obs_var = Variable(obs).type(FloatTensor)
-        # pdb.set_trace()
         action = maddpg.select_action(obs_var)      # action in Variable
         action = action[0].data                     # action in Tensor
         action_np = action.cpu().numpy()            # actions in numpy array
@@ -146,13 +140,12 @@ for i_episode in range(n_episode):
         for x in dim_act_list:
             action_ls.append(action_np[idx:(idx+x)])
             idx += x
-        # pdb.set_trace()
         obs_, reward, done, _ = env.step(action_ls)
         total_reward += sum(reward)
         reward = th.FloatTensor(reward).type(FloatTensor)
 
-        comm_1 = action_np[5: 8].argmax()
-        comm_2 = action_np[13: 16].argmax()
+        comm_1 = action_np[5:8].argmax()
+        comm_2 = action_np[13:16].argmax()
         episode_communications[0, comm_1] += 1
         episode_communications[1, comm_2] += 1
 
@@ -255,7 +248,7 @@ for i_episode in range(n_episode):
                       'critics_target': maddpg.critics_target,
                       'actors_target': maddpg.actors_target,
                       'var': maddpg.var}
-        th.save(states, snapshot_path + snapshot_prefix + str(i_episode))
+        th.save(states, snapshot_path + "/" + snapshot_prefix + str(i_episode))
 
 writer.export_scalars_to_json("./all_scalars.json")
 writer.close()
