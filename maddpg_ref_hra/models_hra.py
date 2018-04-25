@@ -38,7 +38,9 @@ class ActorU(nn.Module):
         result = F.relu(self.FC1(obs))
         result = F.relu(self.FC2(result))
         result = self.FC3(result)
+        # print("Real action result: {}".format(result))
         result = F.tanh(result)     # tanh for physical action
+        # print("Tanh action result: {}".format(result))
         return result
 
 

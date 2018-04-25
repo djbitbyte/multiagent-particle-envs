@@ -25,6 +25,20 @@ parser.add_argument("--snapshot_prefix", type=str, default="reference_latest_epi
                     help="Filename prefix of model snapshots")
 parser.add_argument("--print_action", action="store_true")
 parser.add_argument("--print_communication", action="store_true")
+parser.add_argument("--memory_capacity", type=int, default=30000,
+                    help="capacity for memory replay")
+parser.add_argument("--batch_size", type=int, default=1024,
+                    help="batch size")
+parser.add_argument("--n_episode", type=int, default=200000,
+                    help="max episodes to train")
+parser.add_argument("--max_steps", type=int, default=30,
+                    help="max steps to train per episode")
+parser.add_argument("--episodes_before_train", type=int, default=50,
+                    help="episodes that does not train but collect experiences")
+parser.add_argument("--learning_rate", type=float, default=0.005,
+                    help="learning rate for training")
+parser.add_argument("--weight_decay", type=float, default=1e-4,
+                    help="L2 regularization weight decay")
 
 args = parser.parse_args()
 
@@ -35,10 +49,17 @@ load_model = args.load
 consistency_interval = args.consistency_interval
 print_action = args.print_action
 print_communication = args.print_communication
+memory_capacity = args.memory_capacity
+batch_size = args.batch_size
+n_episode = args.n_episode    # 20000
+max_steps = args.max_steps    # 35
+episodes_before_train = args.episodes_before_train     # 50 ? Not specified in paper
+lr = args.learning_rate       # 0.01
+weight_decay = args.weight_decay
 
 # make environment
-env = make_env('simple_reference', 
-    print_action=print_action, print_communication=print_communication)
+env = make_env('simple_reference',
+               print_action=print_action, print_communication=print_communication)
 n_agents = len(env.world.agents)
 dim_obs_list = [env.observation_space[i].shape[0] for i in range(n_agents)]
 
@@ -52,21 +73,16 @@ for i in range(n_agents):
     else:
         print(env.action_space[i])
 
-capacity = 30000
-batch_size = 1024  # 1024
-
-n_episode = 200000    # 20000
-max_steps = 30    # 35
-episodes_before_train = 50     # 50 ? Not specified in paper
-
 maddpg = MADDPG(n_agents,
                 dim_obs_list,
                 dim_act_list,
                 batch_size,
-                capacity,
+                memory_capacity,
                 episodes_before_train,
+                lr,
+                weight_decay,
                 action_noise="Gaussian_noise",  # ou_noises
-                load_models=load_models)        # path
+                load_models=load_model)         # path
 
 FloatTensor = th.cuda.FloatTensor if maddpg.use_cuda else th.FloatTensor
 
@@ -162,24 +178,6 @@ for i_episode in range(n_episode):
             av_critics_grad += np.array(critics_grad)
             av_actors_grad += np.array(actors_grad)
             n += 1
-    for agent_i in range(n_agents):
-        for goal_i in range(3):
-            if env.world.agents[agent_i].goal_b == env.world.landmarks[goal_i]:
-                communication_mappings[agent_i, goal_i, :] += episode_communications[agent_i, :]
-    
-    if (i_episode % consistency_interval) == consistency_interval - 1:
-        for agent_i in range(n_agents):
-            string = "Agent {}: ".format(agent_i)
-            normalized_agent_mapping = communication_mappings[agent_i,:,:]/np.expand_dims(communication_mappings[agent_i,:,:].sum(1),1)
-            writer.add_scalar('communication/agent{}_det'.format(agent_i),
-                np.linalg.det(normalized_agent_mapping),
-                i_episode)
-            for goal_i in range(3):
-                mapping = communication_mappings[agent_i,goal_i,:]
-                consistency = 0 if mapping.sum() == 0 else mapping.max() / mapping.sum()
-                writer.add_scalar('consistency/agent{}_goal{}'.format(agent_i, goal_i), consistency, i_episode)
-                string += ("{:.1f}% ".format(consistency*100))
-            print(string)
 
     for agent_i in range(n_agents):
         for goal_i in range(3):
@@ -248,7 +246,7 @@ for i_episode in range(n_episode):
                       'critics_target': maddpg.critics_target,
                       'actors_target': maddpg.actors_target,
                       'var': maddpg.var}
-        th.save(states, snapshot_path + "/" + snapshot_prefix + str(i_episode))
+        th.save(states, snapshot_path + snapshot_prefix + str(i_episode))
 
 writer.export_scalars_to_json("./all_scalars.json")
 writer.close()

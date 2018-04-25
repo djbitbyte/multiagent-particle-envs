@@ -32,6 +32,8 @@ class MADDPG:
                  batch_size,
                  capacity,
                  episodes_before_train,
+                 lr,
+                 weight_decay,
                  action_noise=None,
                  load_models=None):
         dim_obs_sum = sum(dim_obs_list)
@@ -46,10 +48,10 @@ class MADDPG:
             self.actorsC_target = deepcopy(self.actorsC)
             self.criticsU_target = deepcopy(self.criticsU)
             self.criticsC_target = deepcopy(self.criticsC)
-            self.criticU_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.criticsU]   # 0.01, 0.005
-            self.criticC_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.criticsC]   # 0.01, 0.005
-            self.actorU_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.actorsU]     # 0.01, 0.005
-            self.actorC_optimizer = [Adam(x.parameters(), lr=0.005) for x in self.actorsC]     # 0.01, 0.005
+            self.criticU_optimizer = [Adam(x.parameters(), lr=lr, weight_decay=weight_decay) for x in self.criticsU]   # 0.01, 0.005
+            self.criticC_optimizer = [Adam(x.parameters(), lr=lr, weight_decay=weight_decay) for x in self.criticsC]   # 0.01, 0.005
+            self.actorU_optimizer = [Adam(x.parameters(), lr=lr, weight_decay=weight_decay) for x in self.actorsU]     # 0.01, 0.005
+            self.actorC_optimizer = [Adam(x.parameters(), lr=lr, weight_decay=weight_decay) for x in self.actorsC]     # 0.01, 0.005
             self.var = [1.0 for i in range(n_agents)]
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i])) for i in range(n_agents)]
