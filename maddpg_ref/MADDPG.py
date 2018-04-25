@@ -58,7 +58,6 @@ class MADDPG:
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i]), x0=states['ou_prevs'][i]) for i in range(n_agents)]
             print('Models loaded!')
-
         self.memory = ReplayMemory(capacity)
         self.n_agents = n_agents
         self.batch_size = batch_size

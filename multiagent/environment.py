@@ -12,7 +12,7 @@ class MultiAgentEnv(gym.Env):
 
     def __init__(self, world, reset_callback=None, reward_callback=None,
                  observation_callback=None, info_callback=None,
-                 done_callback=None, shared_viewer=True,
+                 done_callback=None, shared_viewer=True, 
                  print_communication=False, print_action=False):
 
         self.level = 0
@@ -97,7 +97,7 @@ class MultiAgentEnv(gym.Env):
             actionstr += str(i) + ":\t {:.2f} {:.2f}".format(agent.action.u[0], agent.action.u[1])
         if self.print_action:
             print(actionstr)
-
+        
         # advance world state
         self.world.step()
         # record observation for each agent
@@ -236,7 +236,6 @@ class MultiAgentEnv(gym.Env):
                     message += (other.name + ' to ' + agent.name + ': ' + word + '   ')
             if self.print_communication:
                 print(message)
-
 
         if close:
             # close any existic renderers

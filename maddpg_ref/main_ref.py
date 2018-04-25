@@ -37,7 +37,8 @@ print_action = args.print_action
 print_communication = args.print_communication
 
 # make environment
-env = make_env('simple_reference')
+env = make_env('simple_reference', 
+    print_action=print_action, print_communication=print_communication)
 n_agents = len(env.world.agents)
 dim_obs_list = [env.observation_space[i].shape[0] for i in range(n_agents)]
 
@@ -65,14 +66,13 @@ maddpg = MADDPG(n_agents,
                 capacity,
                 episodes_before_train,
                 action_noise="Gaussian_noise",  # ou_noises
-                load_models=None)               # path
+                load_models=load_models)        # path
 
 FloatTensor = th.cuda.FloatTensor if maddpg.use_cuda else th.FloatTensor
 
 writer = SummaryWriter()
 
 for i_episode in range(n_episode):
-    # pdb.set_trace()
     '''
     # curriculum learning
     if i_episode < 1000:
@@ -131,7 +131,6 @@ for i_episode in range(n_episode):
 
         # obs Tensor turns into Variable before feed into Actor
         obs_var = Variable(obs).type(FloatTensor)
-        # pdb.set_trace()
         action = maddpg.select_action(obs_var)      # action in Variable
         action = action[0].data                     # action in Tensor
         action_np = action.cpu().numpy()            # actions in numpy array
@@ -141,14 +140,12 @@ for i_episode in range(n_episode):
         for x in dim_act_list:
             action_ls.append(action_np[idx:(idx+x)])
             idx += x
-        # pdb.set_trace()
         obs_, reward, done, _ = env.step(action_ls)
-
         total_reward += sum(reward)
         reward = th.FloatTensor(reward).type(FloatTensor)
 
-        comm_1 = action_np[5: 8].argmax()
-        comm_2 = action_np[13: 16].argmax()
+        comm_1 = action_np[5:8].argmax()
+        comm_2 = action_np[13:16].argmax()
         episode_communications[0, comm_1] += 1
         episode_communications[1, comm_2] += 1
 
@@ -165,6 +162,24 @@ for i_episode in range(n_episode):
             av_critics_grad += np.array(critics_grad)
             av_actors_grad += np.array(actors_grad)
             n += 1
+    for agent_i in range(n_agents):
+        for goal_i in range(3):
+            if env.world.agents[agent_i].goal_b == env.world.landmarks[goal_i]:
+                communication_mappings[agent_i, goal_i, :] += episode_communications[agent_i, :]
+    
+    if (i_episode % consistency_interval) == consistency_interval - 1:
+        for agent_i in range(n_agents):
+            string = "Agent {}: ".format(agent_i)
+            normalized_agent_mapping = communication_mappings[agent_i,:,:]/np.expand_dims(communication_mappings[agent_i,:,:].sum(1),1)
+            writer.add_scalar('communication/agent{}_det'.format(agent_i),
+                np.linalg.det(normalized_agent_mapping),
+                i_episode)
+            for goal_i in range(3):
+                mapping = communication_mappings[agent_i,goal_i,:]
+                consistency = 0 if mapping.sum() == 0 else mapping.max() / mapping.sum()
+                writer.add_scalar('consistency/agent{}_goal{}'.format(agent_i, goal_i), consistency, i_episode)
+                string += ("{:.1f}% ".format(consistency*100))
+            print(string)
 
     for agent_i in range(n_agents):
         for goal_i in range(3):
@@ -233,7 +248,7 @@ for i_episode in range(n_episode):
                       'critics_target': maddpg.critics_target,
                       'actors_target': maddpg.actors_target,
                       'var': maddpg.var}
-        th.save(states, snapshot_path + snapshot_prefix + str(i_episode))
+        th.save(states, snapshot_path + "/" + snapshot_prefix + str(i_episode))
 
 writer.export_scalars_to_json("./all_scalars.json")
 writer.close()
