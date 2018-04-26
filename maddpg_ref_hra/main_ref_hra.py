@@ -37,7 +37,7 @@ parser.add_argument("--episodes_before_train", type=int, default=50,
                     help="episodes that does not train but collect experiences")
 parser.add_argument("--learning_rate", type=float, default=0.005,
                     help="learning rate for training")
-parser.add_argument("--weight_decay", type=float, default=1e-4,
+parser.add_argument("--weight_decay", type=float, default=1e-2,
                     help="L2 regularization weight decay")
 
 args = parser.parse_args()
@@ -122,6 +122,11 @@ for i_episode in range(n_episode):
         communication_mappings = np.zeros((n_agents, 3, 3))
     episode_communications = np.zeros((n_agents, 3))
 
+    act_up = []
+    act_down = []
+    act_left = []
+    act_right = []
+
     for t in range(max_steps):
         env.render()
         # time.sleep(0.05)
@@ -166,6 +171,7 @@ for i_episode in range(n_episode):
             av_actorsC_grad += np.array(actorsC_grad)
             n += 1
 
+    # calculate accumulative communication
     for agent_i in range(n_agents):
         for goal_i in range(3):
             if env.world.agents[agent_i].goal_b == env.world.landmarks[goal_i]:
@@ -199,37 +205,42 @@ for i_episode in range(n_episode):
     # plot of reward
     writer.add_scalar('data/reward_refHRA', mean_reward, i_episode)
 
-    # plot of agent0 - speaker gradient of critic net
-    for i in range(6):
-        writer.add_scalar('data/agent0_criticU_gradient', av_criticsU_grad[0][i], i_episode)
+    writer.add_histogram("action/Up", np.array(act_up), i_episode, bins='auto')
+    writer.add_histogram("action/Down", np.array(act_down), i_episode, bins='auto')
+    writer.add_histogram("action/Left", np.array(act_left), i_episode, bins='auto')
+    writer.add_histogram("action/Right", np.array(act_right), i_episode, bins='auto')
 
     # plot of agent0 - speaker gradient of critic net
     for i in range(6):
-        writer.add_scalar('data/agent0_criticC_gradient', av_criticsC_grad[0][i], i_episode)
+        writer.add_scalar('gradient/agent0_criticU_gradient', av_criticsU_grad[0][i], i_episode)
+
+    # plot of agent0 - speaker gradient of critic net
+    for i in range(6):
+        writer.add_scalar('gradient/agent0_criticC_gradient', av_criticsC_grad[0][i], i_episode)
 
     # plot of agent0 - speaker gradient of actorU net
     for i in range(6):
-        writer.add_scalar('data/agent0_actorU_gradient', av_actorsU_grad[0][i], i_episode)
+        writer.add_scalar('gradient/agent0_actorU_gradient', av_actorsU_grad[0][i], i_episode)
 
     # plot of agent0 - speaker gradient of actorC net
     for i in range(6):
-        writer.add_scalar('data/agent0_actorC_gradient', av_actorsC_grad[0][i], i_episode)
+        writer.add_scalar('gradient/agent0_actorC_gradient', av_actorsC_grad[0][i], i_episode)
 
     # plot of agent1 - listener gradient of critics net
     for i in range(6):
-        writer.add_scalar('data/agent1_critic_gradient', av_criticsU_grad[1][i], i_episode)
+        writer.add_scalar('gradient/agent1_critic_gradient', av_criticsU_grad[1][i], i_episode)
 
     # plot of agent1 - listener gradient of critics net
     for i in range(6):
-        writer.add_scalar('data/agent1_critic_gradient', av_criticsC_grad[1][i], i_episode)
+        writer.add_scalar('gradient/agent1_critic_gradient', av_criticsC_grad[1][i], i_episode)
 
     # plot of agent1 - listener gradient of actorU net
     for i in range(6):
-        writer.add_scalar('data/agent1_actorU_gradient', av_actorsU_grad[1][i], i_episode)
+        writer.add_scalar('gradient/agent1_actorU_gradient', av_actorsU_grad[1][i], i_episode)
 
     # plot of agent1 - listener gradient of actorC net
     for i in range(6):
-        writer.add_scalar('data/agent1_actorC_gradient', av_actorsC_grad[1][i], i_episode)
+        writer.add_scalar('gradient/agent1_actorC_gradient', av_actorsC_grad[1][i], i_episode)
 
     # to save models every 500 episodes
     if i_episode != 0 and i_episode % snapshot_interval == 0:
