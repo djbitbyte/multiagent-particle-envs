@@ -20,9 +20,9 @@ parser.add_argument("-l", "--load", type=str, default=None,
                     help="Path to model to load")
 parser.add_argument("--snapshot_interval", type=int, default=500,
                     help="Episodes between model snapshots")
-parser.add_argument("--snapshot_path", type=str, default="/home/jadeng/Documents/snapshot/ref/",
+parser.add_argument("--snapshot_path", type=str, default="/home/jadeng/Documents/snapshot/ref_single_brain/",
                     help="Path to output model snapshots")
-parser.add_argument("--snapshot_prefix", type=str, default="reference_latest_episode_",
+parser.add_argument("--snapshot_prefix", type=str, default="ref_single_brain_latest_episode_",
                     help="Filename prefix of model snapshots")
 parser.add_argument("--print_action", action="store_true")
 parser.add_argument("--print_communication", action="store_true")
@@ -38,7 +38,7 @@ parser.add_argument("--episodes_before_train", type=int, default=50,
                     help="episodes that does not train but collect experiences")
 parser.add_argument("--learning_rate", type=float, default=0.005,
                     help="learning rate for training")
-parser.add_argument("--weight_decay", type=float, default=1e-3,
+parser.add_argument("--weight_decay", type=float, default=0,
                     help="L2 regularization weight decay")
 
 args = parser.parse_args()
@@ -135,8 +135,8 @@ for i_episode in range(n_episode):
 
     total_reward = 0.0
 
-    av_critics_grad = np.zeros((n_agents, 6))
-    av_actors_grad = np.zeros((n_agents, 6))
+    av_critics_grad = np.zeros((1, 6))
+    av_actors_grad = np.zeros((1, 6))
     n = 0
     print('Simple Reference')
     print('Start of episode', i_episode)
@@ -228,7 +228,7 @@ for i_episode in range(n_episode):
     print('End of Episode: %d, mean_reward = %f, total_reward = %f' % (i_episode, mean_reward, total_reward))
 
     # plot of reward
-    writer.add_scalar('data/reward_ref', mean_reward, i_episode)
+    writer.add_scalar('data/reward_ref_single_brain', mean_reward, i_episode)
 
     writer.add_histogram("action/Up", np.array(act_up), i_episode, bins='auto')
     writer.add_histogram("action/Down", np.array(act_down), i_episode, bins='auto')
@@ -243,6 +243,7 @@ for i_episode in range(n_episode):
     for i in range(6):
         writer.add_scalar('gradient/agent0_actor_gradient', av_actors_grad[0][i], i_episode)
 
+    '''
     # plot of agent1 - listener gradient of critics net
     for i in range(6):
         writer.add_scalar('gradient/agent1_critic_gradient', av_critics_grad[1][i], i_episode)
@@ -250,26 +251,27 @@ for i_episode in range(n_episode):
     # plot of agent1 - listener gradient of critics net
     for i in range(6):
         writer.add_scalar('gradient/agent1_actor_gradient', av_actors_grad[1][i], i_episode)
+    '''
 
     # to save models every N episodes
     if i_episode != 0 and i_episode % snapshot_interval == 0:
         print('Save models!')
         if maddpg.action_noise == "OU_noise":
-            states = {'critics': maddpg.critics,
-                      'actors': maddpg.actors,
+            states = {'critic': maddpg.critic,
+                      'actor': maddpg.actor,
                       'critic_optimizer': maddpg.critic_optimizer,
                       'actor_optimizer': maddpg.actor_optimizer,
-                      'critics_target': maddpg.critics_target,
-                      'actors_target': maddpg.actors_target,
+                      'critic_target': maddpg.critic_target,
+                      'actor_target': maddpg.actor_target,
                       'var': maddpg.var,
                       'ou_prevs': [ou_noise.x_prev for ou_noise in maddpg.ou_noises]}
         else:
-            states = {'critics': maddpg.critics,
-                      'actors': maddpg.actors,
+            states = {'critic': maddpg.critic,
+                      'actor': maddpg.actor,
                       'critic_optimizer': maddpg.critic_optimizer,
                       'actor_optimizer': maddpg.actor_optimizer,
-                      'critics_target': maddpg.critics_target,
-                      'actors_target': maddpg.actors_target,
+                      'critic_target': maddpg.critic_target,
+                      'actor_target': maddpg.actor_target,
                       'var': maddpg.var}
         th.save(states, snapshot_path + snapshot_prefix + str(i_episode))
 

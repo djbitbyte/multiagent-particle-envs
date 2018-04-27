@@ -37,7 +37,7 @@ parser.add_argument("--episodes_before_train", type=int, default=50,
                     help="episodes that does not train but collect experiences")
 parser.add_argument("--learning_rate", type=float, default=0.005,
                     help="learning rate for training")
-parser.add_argument("--weight_decay", type=float, default=1e-2,
+parser.add_argument("--weight_decay", type=float, default=1e-4,
                     help="L2 regularization weight decay")
 
 args = parser.parse_args()
@@ -154,6 +154,11 @@ for i_episode in range(n_episode):
         comm_2 = action_np[13:16].argmax()
         episode_communications[0, comm_1] += 1
         episode_communications[1, comm_2] += 1
+
+        act_up.append(action_np[1])
+        act_down.append(action_np[2])
+        act_left.append(action_np[3])
+        act_right.append(action_np[4])
 
         obs_ = np.concatenate(obs_, 0)
         obs_ = th.FloatTensor(obs_).type(FloatTensor)

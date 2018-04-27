@@ -38,24 +38,24 @@ class MADDPG:
         dim_act_sum = sum(dim_act_list)
 
         if load_models is None:
-            self.actors = [Actor(dim_obs, dim_act) for (dim_obs, dim_act) in zip(dim_obs_list, dim_act_list)]
-            self.critics = [Critic(dim_obs_sum, dim_act_sum) for i in range(n_agents)]
-            self.actors_target = deepcopy(self.actors)
-            self.critics_target = deepcopy(self.critics)
-            self.critic_optimizer = [Adam(x.parameters(), lr=lr, weight_decay=weight_decay) for x in self.critics]     # 0.01, 0.005
-            self.actor_optimizer = [Adam(x.parameters(), lr=lr, weight_decay=weight_decay) for x in self.actors]       # 0.01, 0.005
+            self.actor = Actor(dim_obs_list[0], dim_act_list[0])
+            self.critic = Critic(dim_obs_sum, dim_act_sum)
+            self.actor_target = deepcopy(self.actor)
+            self.critic_target = deepcopy(self.critic)
+            self.critic_optimizer = Adam(self.critic.parameters(), lr=lr, weight_decay=weight_decay)     # 0.01, 0.005
+            self.actor_optimizer = Adam(self.actor.parameters(), lr=lr, weight_decay=weight_decay)       # 0.01, 0.005
             self.var = [1.0 for i in range(n_agents)]
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i])) for i in range(n_agents)]
         else:
             print('Start loading models!')
             states = th.load(load_models)
-            self.critics = states['critics']
-            self.actors = states['actors']
+            self.critic = states['critic']
+            self.actor = states['actor']
             self.critic_optimizer = states['critic_optimizer']
             self.actor_optimizer = states['actor_optimizer']
-            self.critics_target = states['critics_target']
-            self.actors_target = states['actors_target']
+            self.critic_target = states['critic_target']
+            self.actor_target = states['actor_target']
             self.var = states['var']
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i]), x0=states['ou_prevs'][i]) for i in range(n_agents)]
@@ -78,14 +78,10 @@ class MADDPG:
         self.scale_reward = 0.01
 
         if self.use_cuda:
-            for x in self.actors:
-                x.cuda()
-            for x in self.critics:
-                x.cuda()
-            for x in self.actors_target:
-                x.cuda()
-            for x in self.critics_target:
-                x.cuda()
+            self.actor.cuda()
+            self.critic.cuda()
+            self.actor_target.cuda()
+            self.critic_target.cuda()
 
         self.steps_done = 0
         self.episode_done = 0
@@ -102,91 +98,96 @@ class MADDPG:
         critics_grad = []
         actors_grad = []
 
-        index_obs = 0
-        index_act = 0
-        for agent in range(self.n_agents):
-            if self.episode_done > 20000:
-                self.batch_size = 2048
-            transitions = self.memory.sample(self.batch_size)
-            batch = Experience(*zip(*transitions))
-            state_batch = Variable(th.stack(batch.states).type(FloatTensor))
-            action_batch = Variable(th.stack(batch.actions).type(FloatTensor))
-            reward_batch = Variable(th.stack(batch.rewards).type(FloatTensor))
-            next_states_batch = Variable(th.stack(batch.next_states).type(FloatTensor))
+        transitions = self.memory.sample(self.batch_size)
+        batch = Experience(*zip(*transitions))
+        state_batch = Variable(th.stack(batch.states).type(FloatTensor))
+        action_batch = Variable(th.stack(batch.actions).type(FloatTensor))
+        reward_batch = Variable(th.stack(batch.rewards).type(FloatTensor))
+        next_states_batch = Variable(th.stack(batch.next_states).type(FloatTensor))
 
-            # for current agent
-            whole_state = state_batch.view(self.batch_size, -1)
-            whole_action = action_batch.view(self.batch_size, -1)
+        # for current agent
+        whole_state = state_batch.view(self.batch_size, -1)
+        whole_action = action_batch.view(self.batch_size, -1)
 
-            # pdb.set_trace()
-            ###### critic network #####
-            self.critic_optimizer[agent].zero_grad()
-            current_Q = self.critics[agent](whole_state, whole_action)
+        # pdb.set_trace()
+        ###### critic network #####
+        self.critic_optimizer.zero_grad()
+        current_Q = self.critic(whole_state, whole_action)
 
-            idx = 0
-            next_actions_ls = []
-            for i in range(self.n_agents):
-                next_action_i = self.actors_target[i](next_states_batch[:, idx:(idx + self.dim_obs_list[i])])
-                next_actions_ls.append(next_action_i)
-                idx += self.dim_obs_list[i]
+        idx = 0
+        next_actions_ls = []
+        for i in range(self.n_agents):
+            next_action_i = self.actor_target(next_states_batch[:, idx:(idx + self.dim_obs_list[i])])
+            next_actions_ls.append(next_action_i)
+            idx += self.dim_obs_list[i]
 
-            next_actions = th.cat(next_actions_ls, 1)
+        next_actions = th.cat(next_actions_ls, 1)
 
-            target_Q = self.critics_target[agent](
-                next_states_batch.view(-1, self.dim_obs_sum),
-                next_actions.view(-1, self.dim_act_sum)
-            )
+        target_Q = self.critic_target(
+            next_states_batch.view(-1, self.dim_obs_sum),
+            next_actions.view(-1, self.dim_act_sum)
+        )
 
-            # here target_Q is y_i of TD error equation
-            # target_Q = (target_Q * self.GAMMA) + (reward_batch[:, agent] * self.scale_reward)
-            target_Q = target_Q * self.GAMMA + reward_batch[:, agent:(agent+1)]
+        # here target_Q is y_i of TD error equation
+        # target_Q = (target_Q * self.GAMMA) + (reward_batch[:, agent] * self.scale_reward)
+        target_Q = target_Q * self.GAMMA + reward_batch[:, 0:1]
 
-            loss_Q = nn.MSELoss()(current_Q, target_Q.detach())
-            loss_Q.backward()
+        loss_Q = nn.MSELoss()(current_Q, target_Q.detach())
+        loss_Q.backward()
 
-            if self.clip is not None:
-                nn.utils.clip_grad_norm(self.critics[agent].parameters(), self.clip)
-            self.critic_optimizer[agent].step()
+        if self.clip is not None:
+            nn.utils.clip_grad_norm(self.critic.parameters(), self.clip)
+        self.critic_optimizer.step()
 
-            ##### actor network #####
-            self.actor_optimizer[agent].zero_grad()
-            state_i = state_batch[:, index_obs:(index_obs+self.dim_obs_list[agent])]
-            index_obs += self.dim_obs_list[agent]
-            action_i = self.actors[agent](state_i)
-            ac = action_batch.clone()
-            ac[:, index_act:(index_act+self.dim_act_list[agent])] = action_i
-            whole_action = ac.view(self.batch_size, -1)
-            index_act += self.dim_act_list[agent]
+        ##### actor network #####
+        self.actor_optimizer.zero_grad()
 
-            actor_loss = -self.critics[agent](whole_state, whole_action)
-            actor_loss = actor_loss.mean()
-            actor_loss.backward()
+        '''
+        idx = 0
+        actions_ls = []
+        for i in range(self.n_agents):
+            action_i = self.actor(state_batch[:, idx:(idx + self.dim_obs_list[i])])
+            actions_ls.append(action_i)
+            idx += self.dim_obs_list[i]
+            actions = th.cat(actions_ls, 1)
+            whole_action = actions.view(self.batch_size, -1)
 
-            if self.clip is not None:
-                nn.utils.clip_grad_norm(self.actors[agent].parameters(), self.clip)
-            self.actor_optimizer[agent].step()
+        '''
 
-            # for plotting
-            c_loss.append(loss_Q)
-            a_loss.append(actor_loss)
+        state_i = state_batch[:, 0:self.dim_obs_list[0]]
+        action_i = self.actor(state_i)
+        ac = action_batch.clone()
+        ac[:, 0:self.dim_act_list[0]] = action_i
+        whole_action = ac.view(self.batch_size, -1)
 
-            critics_agent_grad = []
-            actors_agent_grad = []
-            for x in self.critics[agent].parameters():
-                critics_agent_grad.append(x.grad.data.norm(2))
-                # critics_agent_grad.append(th.mean(x.grad).data[0])
-            for x in self.actors[agent].parameters():
-                actors_agent_grad.append(x.grad.data.norm(2))
-                # actors_agent_grad.append(th.mean(x.grad).data[0])
+        actor_loss = -self.critic(whole_state, whole_action)
+        actor_loss = actor_loss.mean()
+        actor_loss.backward()
 
-            critics_grad.append(critics_agent_grad)
-            actors_grad.append(actors_agent_grad)
+        if self.clip is not None:
+            nn.utils.clip_grad_norm(self.actor.parameters(), self.clip)
+        self.actor_optimizer.step()
+
+        # for plotting
+        c_loss.append(loss_Q)
+        a_loss.append(actor_loss)
+
+        critics_agent_grad = []
+        actors_agent_grad = []
+        for x in self.critic.parameters():
+            critics_agent_grad.append(x.grad.data.norm(2))
+            # critics_agent_grad.append(th.mean(x.grad).data[0])
+        for x in self.actor.parameters():
+            actors_agent_grad.append(x.grad.data.norm(2))
+            # actors_agent_grad.append(th.mean(x.grad).data[0])
+
+        critics_grad.append(critics_agent_grad)
+        actors_grad.append(actors_agent_grad)
 
         # update of target network
         if self.steps_done % 100 == 0 and self.steps_done > 0:
-            for i in range(self.n_agents):
-                soft_update(self.critics_target[i], self.critics[i], self.tau)
-                soft_update(self.actors_target[i], self.actors[i], self.tau)
+            soft_update(self.critic_target, self.critic, self.tau)
+            soft_update(self.actor_target, self.actor, self.tau)
 
         return critics_grad, actors_grad
 
@@ -202,7 +203,7 @@ class MADDPG:
         index_act = 0
         for i in range(self.n_agents):
             sb = obs[:, index_obs:(index_obs+self.dim_obs_list[i])]
-            act = self.actors[i](sb)
+            act = self.actor(sb)
             # act = act.view(self.dim_act_list[i])
 
             # add exploration noise of OU process or Gaussian
