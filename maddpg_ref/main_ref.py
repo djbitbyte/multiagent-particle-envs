@@ -20,7 +20,7 @@ parser.add_argument("-l", "--load", type=str, default=None,
                     help="Path to model to load")
 parser.add_argument("--snapshot_interval", type=int, default=500,
                     help="Episodes between model snapshots")
-parser.add_argument("--snapshot_path", type=str, default="/home/jadeng/Documents/snapshot/ref/",
+parser.add_argument("--snapshot_path", type=str, default="./snapshot/",
                     help="Path to output model snapshots")
 parser.add_argument("--snapshot_prefix", type=str, default="reference_latest_episode_",
                     help="Filename prefix of model snapshots")
@@ -36,10 +36,12 @@ parser.add_argument("--max_steps", type=int, default=30,
                     help="max steps to train per episode")
 parser.add_argument("--episodes_before_train", type=int, default=50,
                     help="episodes that does not train but collect experiences")
-parser.add_argument("--learning_rate", type=float, default=0.005,
+parser.add_argument("--learning_rate", type=float, default=0.001,
                     help="learning rate for training")
 parser.add_argument("--weight_decay", type=float, default=1e-3,
                     help="L2 regularization weight decay")
+parser.add_argument("--valid_freq", type=int, default=100,
+                    help="Validation frequency")
 
 args = parser.parse_args()
 
@@ -57,6 +59,7 @@ max_steps = args.max_steps    # 35
 episodes_before_train = args.episodes_before_train     # 50 ? Not specified in paper
 lr = args.learning_rate       # 0.01
 weight_decay = args.weight_decay
+valid_freq = args.valid_freq
 
 # make environment
 env = make_env('simple_reference',
@@ -64,15 +67,18 @@ env = make_env('simple_reference',
 n_agents = len(env.world.agents)
 dim_obs_list = [env.observation_space[i].shape[0] for i in range(n_agents)]
 
-dim_act_list = []
+print("DEBUG: Hardcoding actions to remove redundant values")
+dim_act_list = [5] * n_agents   # [Up/Down, right/left, 3 communication values]
+'''
 for i in range(n_agents):
     if isinstance(env.action_space[i], spaces.MultiDiscrete):
         size = env.action_space[i].high - env.action_space[i].low + 1
-        dim_act_list.append(sum(size))
+        dim_act_list.append(int(sum(size)))
     elif isinstance(env.action_space[i], spaces.Discrete):
-        dim_act_list.append(env.action_space[i].n)
+        dim_act_list.append(int(env.action_space[i].n))
     else:
         print(env.action_space[i])
+'''
 
 maddpg = MADDPG(n_agents,
                 dim_obs_list,
@@ -94,38 +100,8 @@ writer = SummaryWriter()
 # scheduler_actor = StepLR(maddpg.actor_optimizer, step_size=30000, gamma=0.1)
 
 for i_episode in range(n_episode):
-    # scheduler_critic.step()
-    # scheduler_actor.step()
-
-    '''
-    # curriculum learning
-    if i_episode < 1000:
-        env.set_level(0)
-    elif 1000 <= i_episode < 3000:
-        env.set_level(1)
-    else:
-        env.set_level(2)
-    '''
     env.set_level(2)
-
-    '''
-    # curriculum learning on agents task
-    if i_episode < 10000:
-        env.set_stage(0)
-    else:
-        env.set_stage(1)
-    '''
     env.set_stage(1)
-
-    '''
-    # curriculum learning on agents observation
-    if i_episode < 3000:
-        env.set_obs(0)
-    elif 3000 <= i_episode < 7000:
-        env.set_obs(1)
-    else:
-        env.set_obs(2)
-    '''
     env.set_obs(2)
 
     obs = env.reset()
@@ -149,10 +125,10 @@ for i_episode in range(n_episode):
         communication_mappings = np.zeros((n_agents, 3, 3))
     episode_communications = np.zeros((n_agents, 3))
 
-    act_up = []
-    act_down = []
-    act_left = []
-    act_right = []
+    act_vertical_1 = []
+    act_horizontal_1 = []
+    act_vertical_2 = []
+    act_horizontal_2 = []
 
     for t in range(max_steps):
         env.render()
@@ -166,24 +142,29 @@ for i_episode in range(n_episode):
         # convert action into list of numpy arrays
         idx = 0
         action_ls = []
+
+        # NOTE: Hardcoding unnecessary actions
         for x in dim_act_list:
-            action_ls.append(action_np[idx:(idx+x)])
+            agent_action = action_np[idx:(idx+x)]
+            hardcoded_action = [0, agent_action[0], 0, agent_action[1], 0] + list(agent_action[2:])
+            action_ls.append(np.array(hardcoded_action))
             idx += x
         obs_, reward, done, _ = env.step(action_ls)
         total_reward += sum(reward)
         reward = th.FloatTensor(reward).type(FloatTensor)
 
         # pdb.set_trace()
-        comm_1 = action_np[5:8].argmax()
-        comm_2 = action_np[13:16].argmax()
+
+        comm_1 = action_np[2:5].argmax()
+        comm_2 = action_np[7:10].argmax()
+
         episode_communications[0, comm_1] += 1
         episode_communications[1, comm_2] += 1
 
-        act_up.append(action_np[1])
-        act_down.append(action_np[2])
-        act_left.append(action_np[3])
-        act_right.append(action_np[4])
-        # writer.add_histogram("Forward", act_up, t)
+        act_vertical_1.append(action_np[0])
+        act_horizontal_1.append(action_np[1])
+        act_vertical_2.append(action_np[5])
+        act_horizontal_2.append(action_np[6])
 
         obs_ = np.concatenate(obs_, 0)
         obs_ = th.FloatTensor(obs_).type(FloatTensor)
@@ -230,10 +211,10 @@ for i_episode in range(n_episode):
     # plot of reward
     writer.add_scalar('data/reward_ref', mean_reward, i_episode)
 
-    writer.add_histogram("action/Up", np.array(act_up), i_episode, bins='auto')
-    writer.add_histogram("action/Down", np.array(act_down), i_episode, bins='auto')
-    writer.add_histogram("action/Left", np.array(act_left), i_episode, bins='auto')
-    writer.add_histogram("action/Right", np.array(act_right), i_episode, bins='auto')
+    writer.add_histogram("agent1_vertical", np.array(act_vertical_1), i_episode, bins='auto')
+    writer.add_histogram("agent1_horizontal", np.array(act_horizontal_1), i_episode, bins='auto')
+    writer.add_histogram("agent2_vertical", np.array(act_vertical_2), i_episode, bins='auto')
+    writer.add_histogram("agent2_horizontal", np.array(act_horizontal_2), i_episode, bins='auto')
 
     # plot of agent0 - speaker gradient of critic net
     for i in range(6):
@@ -273,27 +254,72 @@ for i_episode in range(n_episode):
                       'var': maddpg.var}
         th.save(states, snapshot_path + snapshot_prefix + str(i_episode))
 
+    if i_episode % valid_freq == 0:
+        # Validate policy
+        maddpg.set_validation_mode()
+
+        valid_communication_mappings = np.zeros((n_agents, 3, 3))
+
+        valid_rewards = []
+        for valid_episode in range(10):
+            valid_episode_communications = np.zeros((n_agents, 3))
+            total_reward = 0.0
+            obs = env.reset()
+            obs = np.concatenate(obs, 0)
+            if isinstance(obs, np.ndarray):
+                obs = th.FloatTensor(obs).type(FloatTensor)    # obs in Tensor
+
+            for i in range(max_steps):
+                env.render()
+                # obs Tensor turns into Variable before feed into Actor
+                obs_var = Variable(obs).type(FloatTensor)
+                action = maddpg.select_action(obs_var)      # action in Variable
+                action = action[0].data                     # action in Tensor
+                action_np = action.cpu().numpy()            # actions in numpy array
+                # convert action into list of numpy arrays
+                idx = 0
+                action_ls = []
+
+                # NOTE: Hardcoding unnecessary actions
+                for x in dim_act_list:
+                    agent_action = action_np[idx:(idx+x)]
+                    hardcoded_action = [0, agent_action[0], 0, agent_action[1], 0] + list(agent_action[2:])
+                    action_ls.append(np.array(hardcoded_action))
+                    idx += x
+                obs_, reward, done, _ = env.step(action_ls)
+                total_reward += sum(reward)
+
+                comm_1 = action_np[2:5].argmax()
+                comm_2 = action_np[7:10].argmax()
+
+                valid_episode_communications[0, comm_1] += 1
+                valid_episode_communications[1, comm_2] += 1
+
+                obs_ = np.concatenate(obs_, 0)
+                obs_ = th.FloatTensor(obs_).type(FloatTensor)
+
+                obs = obs_
+
+            mean_reward = total_reward / max_steps
+            valid_rewards.append(mean_reward)
+
+            for agent_i in range(n_agents):
+                for goal_i in range(3):
+                    if env.world.agents[agent_i].goal_b == env.world.landmarks[goal_i]:
+                        valid_communication_mappings[agent_i, goal_i, :] += valid_episode_communications[agent_i, :]
+
+        writer.add_scalar('data/valid_reward', np.mean(valid_rewards), i_episode)
+        for agent_i in range(n_agents):
+            valid_normalized_agent_mapping = valid_communication_mappings[agent_i, :, :] / np.expand_dims(valid_communication_mappings[agent_i, :, :].sum(1), 1)
+            writer.add_scalar('valid_communication/agent{}_det'.format(agent_i),
+                              np.linalg.det(valid_normalized_agent_mapping),
+                              i_episode)
+            for goal_i in range(3):
+                mapping = valid_communication_mappings[agent_i, goal_i, :]
+                consistency = 0 if mapping.sum() == 0 else mapping.max() / mapping.sum()
+                writer.add_scalar('valid_consistency/agent{}_goal{}'.format(agent_i, goal_i), consistency, i_episode)
+
+        maddpg.set_training_mode("Gaussian_noise")
+
 writer.export_scalars_to_json("./all_scalars.json")
 writer.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

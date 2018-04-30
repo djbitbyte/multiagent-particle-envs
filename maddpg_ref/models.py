@@ -6,7 +6,7 @@ import numpy as np
 import pdb
 
 
-nodes = 64
+nodes = 128
 
 
 def normal_noise(dim_action):
@@ -27,12 +27,16 @@ def gumbel_softmax(ret, dim_action, temp=1):
 
 
 class Actor(nn.Module):
-    def __init__(self, dim_observation, dim_action):
+    def __init__(self, dim_observation, dim_action, valid = False):
         self.dim_action = dim_action
+        self.valid = valid
         super(Actor, self).__init__()
         self.FC1 = nn.Linear(dim_observation, nodes)
         self.FC2 = nn.Linear(nodes, nodes)
         self.FC3 = nn.Linear(nodes, dim_action)
+
+    def set_validating(self, state):
+        self.valid = state
 
     def forward(self, obs):
         result = F.relu(self.FC1(obs))
@@ -42,7 +46,13 @@ class Actor(nn.Module):
         if self.dim_action == 3:
             result = gumbel_softmax(result, self.dim_action)
         elif self.dim_action == 5:
-            result = F.tanh(result)
+            #result = F.tanh(result)
+            result_u = F.tanh(result[:, :2])
+            if self.valid:
+                result_c = F.softmax(result[:, 2:])
+            else:
+                result_c = gumbel_softmax(result[:, 2:], 3)
+            result = th.cat((result_u, result_c), 1)
         elif self.dim_action == 8:   # action space with physical & comm action
             result_u = F.tanh(result[:, :5])
             result_c = gumbel_softmax(result[:, 5:], 3)
@@ -68,17 +78,3 @@ class Critic(nn.Module):
         result = F.relu(self.FC2(result))
         result = self.FC3(result)
         return result
-
-
-
-
-
-
-
-
-
-
-
-
-
-

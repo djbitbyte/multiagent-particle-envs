@@ -94,7 +94,7 @@ class Scenario(BaseScenario):
             dist_1 = np.sqrt(dist2_1)
             r1 = -dist2_1 - dist_1
             # decide reward here
-            r = (r0 + r1) / 2
+            r = r0 + r1 #(r0 + r1) / 2
 
         # Block for de-composite reward
         else:

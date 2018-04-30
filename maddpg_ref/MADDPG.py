@@ -33,7 +33,8 @@ class MADDPG:
                  lr,
                  weight_decay,
                  action_noise=None,
-                 load_models=None):
+                 load_models=None,
+                 validating = False):
         dim_obs_sum = sum(dim_obs_list)
         dim_act_sum = sum(dim_act_list)
 
@@ -52,6 +53,9 @@ class MADDPG:
             states = th.load(load_models)
             self.critics = states['critics']
             self.actors = states['actors']
+            if validating:
+                for actor in self.actors:
+                    actor.set_validating(True)
             self.critic_optimizer = states['critic_optimizer']
             self.actor_optimizer = states['actor_optimizer']
             self.critics_target = states['critics_target']
@@ -60,7 +64,7 @@ class MADDPG:
             if action_noise == "OU_noise":
                 self.ou_noises = [ou(mu=np.zeros(dim_act_list[i]), x0=states['ou_prevs'][i]) for i in range(n_agents)]
             print('Models loaded!')
-            
+
         self.memory = ReplayMemory(capacity)
         self.n_agents = n_agents
         self.batch_size = batch_size
@@ -89,6 +93,18 @@ class MADDPG:
 
         self.steps_done = 0
         self.episode_done = 0
+
+    def set_validation_mode(self):
+        for actor in self.actors:
+            actor.set_validating(True)
+
+        self.action_noise = None
+
+    def set_training_mode(self, noise):
+        for actor in self.actors:
+            actor.set_validating(False)
+
+        self.action_noise = noise
 
     def update_policy(self):
         if self.episode_done <= self.episodes_before_train:
@@ -208,15 +224,22 @@ class MADDPG:
             # add exploration noise of OU process or Gaussian
             if self.action_noise == "OU_noise":
                 if self.dim_act_list[i] == 5:
-                    act += Variable(th.FloatTensor(self.ou_noises[i]() * self.var[i]).type(FloatTensor))
+                    #act += Variable(th.FloatTensor(self.ou_noises[i]() * self.var[i]).type(FloatTensor))
+                    # NOTE: Camilo - because actions were reduced in environment
+                    noise = th.FloatTensor(self.ou_noises[i]() * self.var[i]).type(FloatTensor)
+                    noise[-3:] = th.zeros(3).type(FloatTensor)
+                    act += Variable(noise)
                 if self.dim_act_list[i] == 8:
                     noise = th.FloatTensor(self.ou_noises[i]() * self.var[i]).type(FloatTensor)
                     noise[-3:] = th.zeros(3).type(FloatTensor)
                     act += Variable(noise)
             elif self.action_noise == "Gaussian_noise":
                 if self.dim_act_list[i] == 5:
-                    act += Variable(
-                        th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor))
+                    #act += Variable(th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor))
+                    # NOTE: Camilo - because actions were reduced in environment
+                    noise = th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor)
+                    noise[-3:] = th.zeros(3).type(FloatTensor)
+                    act += Variable(noise)
                 if self.dim_act_list[i] == 8:
                     noise = th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor)
                     noise[-3:] = th.zeros(3).type(FloatTensor)
@@ -236,21 +259,3 @@ class MADDPG:
         self.steps_done += 1
 
         return actions
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
