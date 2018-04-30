@@ -38,8 +38,10 @@ parser.add_argument("--episodes_before_train", type=int, default=50,
                     help="episodes that does not train but collect experiences")
 parser.add_argument("--learning_rate", type=float, default=0.005,
                     help="learning rate for training")
-parser.add_argument("--weight_decay", type=float, default=0,
+parser.add_argument("--weight_decay", type=float, default=1e-4,
                     help="L2 regularization weight decay")
+parser.add_argument("--physical_channel", type=int, default=5,
+                    help="physical movement channel, default as 5; alternative as 2")
 
 args = parser.parse_args()
 
@@ -57,6 +59,7 @@ max_steps = args.max_steps    # 35
 episodes_before_train = args.episodes_before_train     # 50 ? Not specified in paper
 lr = args.learning_rate       # 0.01
 weight_decay = args.weight_decay
+physical_channel = args.physical_channel
 
 # make environment
 env = make_env('simple_reference',
@@ -68,7 +71,12 @@ dim_act_list = []
 for i in range(n_agents):
     if isinstance(env.action_space[i], spaces.MultiDiscrete):
         size = env.action_space[i].high - env.action_space[i].low + 1
-        dim_act_list.append(sum(size))
+        if physical_channel == 5:
+            dim_act_list.append(sum(size))
+        elif physical_channel == 2:
+            dim_act_list.append(sum(size) - 3)
+        else:
+            AssertionError("Unexpected value: ", physical_channel)
     elif isinstance(env.action_space[i], spaces.Discrete):
         dim_act_list.append(env.action_space[i].n)
     else:
@@ -149,10 +157,14 @@ for i_episode in range(n_episode):
         communication_mappings = np.zeros((n_agents, 3, 3))
     episode_communications = np.zeros((n_agents, 3))
 
-    act_up = []
-    act_down = []
-    act_left = []
-    act_right = []
+    if physical_channel == 2:
+        act_up = []
+        act_left = []
+    elif physical_channel == 5:
+        act_up = []
+        act_down = []
+        act_left = []
+        act_right = []
 
     for t in range(max_steps):
         env.render()
@@ -169,21 +181,31 @@ for i_episode in range(n_episode):
         for x in dim_act_list:
             action_ls.append(action_np[idx:(idx+x)])
             idx += x
+
+        if physical_channel == 2:
+            for i in range(n_agents):
+                action_ls[i] = np.insert(action_ls[i], 0, 0)
+                action_ls[i] = np.insert(action_ls[i], 2, 0)
+                action_ls[i] = np.insert(action_ls[i], 4, 0)
+
         obs_, reward, done, _ = env.step(action_ls)
         total_reward += sum(reward)
         reward = th.FloatTensor(reward).type(FloatTensor)
 
         # pdb.set_trace()
-        comm_1 = action_np[5:8].argmax()
-        comm_2 = action_np[13:16].argmax()
+        comm_1 = action_ls[0][5:8].argmax()
+        comm_2 = action_ls[1][5:8].argmax()
         episode_communications[0, comm_1] += 1
         episode_communications[1, comm_2] += 1
 
-        act_up.append(action_np[1])
-        act_down.append(action_np[2])
-        act_left.append(action_np[3])
-        act_right.append(action_np[4])
-        # writer.add_histogram("Forward", act_up, t)
+        if physical_channel == 2:
+            act_up.append(action_np[1])
+            act_left.append(action_np[3])
+        elif physical_channel == 5:
+            act_up.append(action_np[1])
+            act_down.append(action_np[2])
+            act_left.append(action_np[3])
+            act_right.append(action_np[4])
 
         obs_ = np.concatenate(obs_, 0)
         obs_ = th.FloatTensor(obs_).type(FloatTensor)
@@ -230,10 +252,15 @@ for i_episode in range(n_episode):
     # plot of reward
     writer.add_scalar('data/reward_ref_single_brain', mean_reward, i_episode)
 
-    writer.add_histogram("action/Up", np.array(act_up), i_episode, bins='auto')
-    writer.add_histogram("action/Down", np.array(act_down), i_episode, bins='auto')
-    writer.add_histogram("action/Left", np.array(act_left), i_episode, bins='auto')
-    writer.add_histogram("action/Right", np.array(act_right), i_episode, bins='auto')
+    # plot of histogram for actions
+    if physical_channel == 2:
+        writer.add_histogram("action/Up", np.array(act_up), i_episode, bins='auto')
+        writer.add_histogram("action/Left", np.array(act_left), i_episode, bins='auto')
+    elif physical_channel == 5:
+        writer.add_histogram("action/Up", np.array(act_up), i_episode, bins='auto')
+        writer.add_histogram("action/Down", np.array(act_down), i_episode, bins='auto')
+        writer.add_histogram("action/Left", np.array(act_left), i_episode, bins='auto')
+        writer.add_histogram("action/Right", np.array(act_right), i_episode, bins='auto')
 
     # plot of agent0 - speaker gradient of critic net
     for i in range(6):

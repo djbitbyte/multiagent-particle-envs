@@ -38,7 +38,7 @@ parser.add_argument("--episodes_before_train", type=int, default=50,
                     help="episodes that does not train but collect experiences")
 parser.add_argument("--learning_rate", type=float, default=0.005,
                     help="learning rate for training")
-parser.add_argument("--weight_decay", type=float, default=1e-3,
+parser.add_argument("--weight_decay", type=float, default=1e-4,
                     help="L2 regularization weight decay")
 
 args = parser.parse_args()

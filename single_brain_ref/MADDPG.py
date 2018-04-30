@@ -154,19 +154,25 @@ class MADDPG:
 
         '''
 
-        state_i = state_batch[:, 0:self.dim_obs_list[0]]
-        action_i = self.actor(state_i)
-        ac = action_batch.clone()
-        ac[:, 0:self.dim_act_list[0]] = action_i
-        whole_action = ac.view(self.batch_size, -1)
+        idx_obs = 0
+        idx_act = 0
+        for i in range(self.n_agents):
+            state_i = state_batch[:, idx_obs:(idx_obs + self.dim_obs_list[i])]
+            action_i = self.actor(state_i)
+            ac = action_batch.clone()
+            ac[:, idx_act:(idx_act + self.dim_act_list[i])] = action_i
+            whole_action = ac.view(self.batch_size, -1)
 
-        actor_loss = -self.critic(whole_state, whole_action)
-        actor_loss = actor_loss.mean()
-        actor_loss.backward()
+            actor_loss = -self.critic(whole_state, whole_action)
+            actor_loss = actor_loss.mean()
+            actor_loss.backward()
 
-        if self.clip is not None:
-            nn.utils.clip_grad_norm(self.actor.parameters(), self.clip)
-        self.actor_optimizer.step()
+            if self.clip is not None:
+                nn.utils.clip_grad_norm(self.actor.parameters(), self.clip)
+            self.actor_optimizer.step()
+
+            idx_obs += self.dim_obs_list[i]
+            idx_act += self.dim_act_list[i]
 
         # for plotting
         c_loss.append(loss_Q)
@@ -215,13 +221,9 @@ class MADDPG:
                     noise[-3:] = th.zeros(3).type(FloatTensor)
                     act += Variable(noise)
             elif self.action_noise == "Gaussian_noise":
-                if self.dim_act_list[i] == 5:
-                    act += Variable(
-                        th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor))
-                if self.dim_act_list[i] == 8:
-                    noise = th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor)
-                    noise[-3:] = th.zeros(3).type(FloatTensor)
-                    act += Variable(noise)
+                noise = th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor)
+                noise[-3:] = th.zeros(3).type(FloatTensor)
+                act += Variable(noise)
 
             # decay of action exploration
             if self.episode_done > self.episodes_before_train and self.var[i] > 0.05:
