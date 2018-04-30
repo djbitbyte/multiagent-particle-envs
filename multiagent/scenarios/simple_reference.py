@@ -162,7 +162,7 @@ class Scenario(BaseScenario):
             else:
                 comm.append(world.agents[0].state.c)
 
-        else:
+        elif obs == 2:
             for other in world.agents:
                 if other is agent: continue
                 comm.append(other.state.c)

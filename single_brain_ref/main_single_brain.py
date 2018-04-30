@@ -199,8 +199,8 @@ for i_episode in range(n_episode):
         episode_communications[1, comm_2] += 1
 
         if physical_channel == 2:
-            act_up.append(action_np[1])
-            act_left.append(action_np[3])
+            act_up.append(action_np[0])
+            act_left.append(action_np[1])
         elif physical_channel == 5:
             act_up.append(action_np[1])
             act_down.append(action_np[2])

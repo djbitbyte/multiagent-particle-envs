@@ -128,6 +128,7 @@ class MADDPG:
             next_actions.view(-1, self.dim_act_sum)
         )
 
+        pdb.set_trace()
         # here target_Q is y_i of TD error equation
         # target_Q = (target_Q * self.GAMMA) + (reward_batch[:, agent] * self.scale_reward)
         target_Q = target_Q * self.GAMMA + reward_batch[:, 0:1]
@@ -157,6 +158,7 @@ class MADDPG:
         idx_obs = 0
         idx_act = 0
         for i in range(self.n_agents):
+            self.actor_optimizer.zero_grad()
             state_i = state_batch[:, idx_obs:(idx_obs + self.dim_obs_list[i])]
             action_i = self.actor(state_i)
             ac = action_batch.clone()
