@@ -195,7 +195,7 @@ for i_episode in range(n_episode):
                               i_episode)
             for goal_i in range(3):
                 mapping = communication_mappings[agent_i, goal_i, :]
-                consistency = 0 if mapping.sum() == 0 else mapping.max() / mapping.sum()
+                consistency = 1 if mapping.sum() == 0 else mapping.max() / mapping.sum()
                 writer.add_scalar('consistency/agent{}_goal{}'.format(agent_i, goal_i), consistency, i_episode)
                 string += ("{:.1f}% ".format(consistency * 100))
             print(string)
@@ -316,7 +316,7 @@ for i_episode in range(n_episode):
                               i_episode)
             for goal_i in range(3):
                 mapping = valid_communication_mappings[agent_i, goal_i, :]
-                consistency = 0 if mapping.sum() == 0 else mapping.max() / mapping.sum()
+                consistency = 1 if mapping.sum() == 0 else mapping.max() / mapping.sum()
                 writer.add_scalar('valid_consistency/agent{}_goal{}'.format(agent_i, goal_i), consistency, i_episode)
 
         maddpg.set_training_mode("Gaussian_noise")

@@ -6,7 +6,7 @@ import numpy as np
 import pdb
 
 
-nodes = 128
+nodes = 64 
 
 
 def normal_noise(dim_action):
