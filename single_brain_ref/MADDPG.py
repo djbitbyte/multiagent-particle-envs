@@ -128,7 +128,6 @@ class MADDPG:
             next_actions.view(-1, self.dim_act_sum)
         )
 
-        pdb.set_trace()
         # here target_Q is y_i of TD error equation
         # target_Q = (target_Q * self.GAMMA) + (reward_batch[:, agent] * self.scale_reward)
         target_Q = target_Q * self.GAMMA + reward_batch[:, 0:1]
@@ -141,9 +140,9 @@ class MADDPG:
         self.critic_optimizer.step()
 
         ##### actor network #####
-        self.actor_optimizer.zero_grad()
 
         '''
+        # actor only trained on one agent
         idx = 0
         actions_ls = []
         for i in range(self.n_agents):
@@ -155,6 +154,7 @@ class MADDPG:
 
         '''
 
+        # actor trained on both agents
         idx_obs = 0
         idx_act = 0
         for i in range(self.n_agents):

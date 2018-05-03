@@ -214,13 +214,9 @@ class MADDPG:
                     noise[-3:] = th.zeros(3).type(FloatTensor)
                     act += Variable(noise)
             elif self.action_noise == "Gaussian_noise":
-                if self.dim_act_list[i] == 5:
-                    act += Variable(
-                        th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor))
-                if self.dim_act_list[i] == 8:
-                    noise = th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor)
-                    noise[-3:] = th.zeros(3).type(FloatTensor)
-                    act += Variable(noise)
+                noise = th.FloatTensor(np.random.randn(self.dim_act_list[i]) * self.var[i]).type(FloatTensor)
+                noise[-3:] = th.zeros(3).type(FloatTensor)
+                act += Variable(noise)
 
             # decay of action exploration
             if self.episode_done > self.episodes_before_train and self.var[i] > 0.05:

@@ -42,6 +42,9 @@ parser.add_argument("--weight_decay", type=float, default=1e-4,
                     help="L2 regularization weight decay")
 parser.add_argument("--physical_channel", type=int, default=5,
                     help="physical movement channel, default as 5; alternative as 2")
+parser.add_argument("--curriculum_learning", type=str, default=None,
+                    help="different curriculum learning added for training,"
+                         "None as default, other options of level, stage and obs")
 
 args = parser.parse_args()
 
@@ -60,6 +63,7 @@ episodes_before_train = args.episodes_before_train     # 50 ? Not specified in p
 lr = args.learning_rate       # 0.01
 weight_decay = args.weight_decay
 physical_channel = args.physical_channel
+curriculum_learning = args.curriculum_learning
 
 # make environment
 env = make_env('simple_reference',
@@ -105,36 +109,33 @@ for i_episode in range(n_episode):
     # scheduler_critic.step()
     # scheduler_actor.step()
 
-    '''
     # curriculum learning
-    if i_episode < 1000:
-        env.set_level(0)
-    elif 1000 <= i_episode < 3000:
-        env.set_level(1)
-    else:
+    if curriculum_learning == "level":
+        if i_episode < 1000:
+            env.set_level(0)
+        elif 1000 <= i_episode < 3000:
+            env.set_level(1)
+        else:
+            env.set_level(2)
+    if curriculum_learning == "stage":
+        # curriculum learning on agents task
+        if i_episode < 10000:
+            env.set_stage(0)
+        else:
+            env.set_stage(1)
+    if curriculum_learning == "obs":
+        # curriculum learning on agents observation
+        if i_episode < 3000:
+            env.set_obs(0)
+        elif 3000 <= i_episode < 7000:
+            env.set_obs(1)
+        else:
+            env.set_obs(2)
+    # No curriculum learning
+    if curriculum_learning is None:
         env.set_level(2)
-    '''
-    env.set_level(2)
-
-    '''
-    # curriculum learning on agents task
-    if i_episode < 10000:
-        env.set_stage(0)
-    else:
         env.set_stage(1)
-    '''
-    env.set_stage(1)
-
-    '''
-    # curriculum learning on agents observation
-    if i_episode < 3000:
-        env.set_obs(0)
-    elif 3000 <= i_episode < 7000:
-        env.set_obs(1)
-    else:
         env.set_obs(2)
-    '''
-    env.set_obs(2)
 
     obs = env.reset()
     obs = np.concatenate(obs, 0)
@@ -236,7 +237,7 @@ for i_episode in range(n_episode):
                               i_episode)
             for goal_i in range(3):
                 mapping = communication_mappings[agent_i, goal_i, :]
-                consistency = 0 if mapping.sum() == 0 else mapping.max() / mapping.sum()
+                consistency = 1 if mapping.sum() == 0 else mapping.max() / mapping.sum()
                 writer.add_scalar('consistency/agent{}_goal{}'.format(agent_i, goal_i), consistency, i_episode)
                 string += ("{:.1f}% ".format(consistency * 100))
             print(string)
@@ -269,16 +270,6 @@ for i_episode in range(n_episode):
     # plot of agent0 - speaker gradient of actor net
     for i in range(6):
         writer.add_scalar('gradient/agent0_actor_gradient', av_actors_grad[0][i], i_episode)
-
-    '''
-    # plot of agent1 - listener gradient of critics net
-    for i in range(6):
-        writer.add_scalar('gradient/agent1_critic_gradient', av_critics_grad[1][i], i_episode)
-
-    # plot of agent1 - listener gradient of critics net
-    for i in range(6):
-        writer.add_scalar('gradient/agent1_actor_gradient', av_actors_grad[1][i], i_episode)
-    '''
 
     # to save models every N episodes
     if i_episode != 0 and i_episode % snapshot_interval == 0:

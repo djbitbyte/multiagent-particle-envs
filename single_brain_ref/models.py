@@ -42,11 +42,10 @@ class Actor(nn.Module):
         if self.dim_action == 5:
             result_u = F.tanh(result[:, :2])
             result_c = gumbel_softmax(result[:, 2:], 3)
-            result = th.cat((result_u, result_c), 1)
         elif self.dim_action == 8:   # action space with physical & comm action
             result_u = F.tanh(result[:, :5])
             result_c = gumbel_softmax(result[:, 5:], 3)
-            result = th.cat((result_u, result_c), 1)
+        result = th.cat((result_u, result_c), 1)
         return result
 
 
