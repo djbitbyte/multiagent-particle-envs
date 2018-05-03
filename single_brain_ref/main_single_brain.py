@@ -42,6 +42,8 @@ parser.add_argument("--weight_decay", type=float, default=1e-4,
                     help="L2 regularization weight decay")
 parser.add_argument("--physical_channel", type=int, default=5,
                     help="physical movement channel, default as 5; alternative as 2")
+parser.add_argument("--lr_decay", type=bool, default=False,
+                    help="learning rate decay, default as False")
 parser.add_argument("--curriculum_learning", type=str, default=None,
                     help="different curriculum learning added for training,"
                          "None as default, other options of level, stage and obs")
@@ -63,6 +65,7 @@ episodes_before_train = args.episodes_before_train     # 50 ? Not specified in p
 lr = args.learning_rate       # 0.01
 weight_decay = args.weight_decay
 physical_channel = args.physical_channel
+lr_decay = args.lr_decay
 curriculum_learning = args.curriculum_learning
 
 # make environment
@@ -102,12 +105,14 @@ FloatTensor = th.cuda.FloatTensor if maddpg.use_cuda else th.FloatTensor
 writer = SummaryWriter()
 
 # learning rate decay
-# scheduler_critic = StepLR(maddpg.critic_optimizer, step_size=30000, gamma=0.1)
-# scheduler_actor = StepLR(maddpg.actor_optimizer, step_size=30000, gamma=0.1)
+if lr_decay:
+    scheduler_critic = StepLR(maddpg.critic_optimizer, step_size=30000, gamma=0.1)
+    scheduler_actor = StepLR(maddpg.actor_optimizer, step_size=30000, gamma=0.1)
 
 for i_episode in range(n_episode):
-    # scheduler_critic.step()
-    # scheduler_actor.step()
+    if lr_decay:
+        scheduler_critic.step()
+        scheduler_actor.step()
 
     # curriculum learning
     if curriculum_learning == "level":
