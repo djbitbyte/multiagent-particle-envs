@@ -36,9 +36,9 @@ parser.add_argument("--max_steps", type=int, default=30,
                     help="max steps to train per episode")
 parser.add_argument("--episodes_before_train", type=int, default=50,
                     help="episodes that does not train but collect experiences")
-parser.add_argument("--learning_rate", type=float, default=0.005,
+parser.add_argument("--learning_rate", type=float, default=0.001,
                     help="learning rate for training")
-parser.add_argument("--weight_decay", type=float, default=1e-4,
+parser.add_argument("--weight_decay", type=float, default=1e-3,
                     help="L2 regularization weight decay")
 parser.add_argument("--physical_channel", type=int, default=5,
                     help="physical movement channel, default as 5; alternative as 2")
