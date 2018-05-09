@@ -20,7 +20,7 @@ parser.add_argument("-l", "--load", type=str, default=None,
                     help="Path to model to load")
 parser.add_argument("--snapshot_interval", type=int, default=500,
                     help="Episodes between model snapshots")
-parser.add_argument("--snapshot_path", type=str, default="/home/jadeng/Documents/snapshot/ref/",
+parser.add_argument("--snapshot_path", type=str, default="/home/janet/dev/snapshot/ref/",
                     help="Path to output model snapshots")
 parser.add_argument("--snapshot_prefix", type=str, default="reference_latest_episode_",
                     help="Filename prefix of model snapshots")
@@ -79,9 +79,9 @@ for i in range(n_agents):
     if isinstance(env.action_space[i], spaces.MultiDiscrete):
         size = env.action_space[i].high - env.action_space[i].low + 1
         if physical_channel == 5:
-            dim_act_list.append(sum(size))
+            dim_act_list.append(int(sum(size)))
         elif physical_channel == 2:
-            dim_act_list.append(sum(size) - 3)
+            dim_act_list.append(int(sum(size) - 3))
         else:
             AssertionError("Unexpected value: ", physical_channel)
     elif isinstance(env.action_space[i], spaces.Discrete):
@@ -144,6 +144,7 @@ for i_episode in range(n_episode):
         env.set_stage(1)
         env.set_obs(2)
 
+    # pdb.set_trace()
     obs = env.reset()
     obs = np.concatenate(obs, 0)
     if isinstance(obs, np.ndarray):

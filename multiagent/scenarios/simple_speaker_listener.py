@@ -69,7 +69,7 @@ class Scenario(BaseScenario):
         r = -dist2-dist
         return r
 
-    def observation(self, agent, world):
+    def observation(self, agent, world, obs=0):
         # goal color
         goal_color = np.zeros(world.dim_color)
         if agent.goal_b is not None:

@@ -32,7 +32,7 @@ n_episode = 60000    # 20000
 max_steps = 30    # 25
 episodes_before_train = 50     # 50 ? Not specified in paper
 
-snapshot_path = "/home/jadeng/Documents/snapshot/SL/"
+snapshot_path = "/home/janet/dev/snapshot/SL/"
 # snapshot_path = "/home/jadeng/Desktop/snapshot_SL/"
 snapshot_name = "speaker_listener_latest_episode_"
 path = snapshot_path + snapshot_name + '80'
@@ -113,19 +113,19 @@ for i_episode in range(n_episode):
 
     # plot of agent0 - speaker gradient of critic net
     for i in range(6):
-        writer.add_scalar('data/speaker_critic_gradient', av_critics_grad[0][i], i_episode)
+        writer.add_scalar('gradient/speaker_critic_gradient', av_critics_grad[0][i], i_episode)
 
     # plot of agent0 - speaker gradient of actor net
     for i in range(6):
-        writer.add_scalar('data/speaker_actor_gradient', av_actors_grad[0][i], i_episode)
+        writer.add_scalar('gradient/speaker_actor_gradient', av_actors_grad[0][i], i_episode)
 
     # plot of agent1 - listener gradient of critics net
     for i in range(6):
-        writer.add_scalar('data/listener_critic_gradient', av_critics_grad[1][i], i_episode)
+        writer.add_scalar('gradient/listener_critic_gradient', av_critics_grad[1][i], i_episode)
 
     # plot of agent1 - speaker gradient of critics net
     for i in range(6):
-        writer.add_scalar('data/listener_actor_gradient', av_actors_grad[1][i], i_episode)
+        writer.add_scalar('gradient/listener_actor_gradient', av_actors_grad[1][i], i_episode)
 
     # to save models every 200 episodes
     if i_episode != 0 and i_episode % 500 == 0:

@@ -220,7 +220,7 @@ class MADDPG:
 
             # decay of action exploration
             if self.episode_done > self.episodes_before_train and self.var[i] > 0.05:
-                self.var[i] *= 0.999998     # 0.99995
+                self.var[i] *= 0.999998      # 0.999998     # 0.99995
 
             # ? remove ?
             act = th.clamp(act, -1.0, 1.0)
