@@ -19,9 +19,9 @@ parser.add_argument("-l", "--load", type=str, default=None,
                     help="Path to model to load")
 parser.add_argument("--snapshot_interval", type=int, default=500,
                     help="Episodes between model snapshots")
-parser.add_argument("--snapshot_path", type=str, default="/home/jadeng/Documents/snapshot/ref_hra/",
+parser.add_argument("--snapshot_path", type=str, default="/home/janet/dev/snapshot/ref_hra/",
                     help="Path to output model snapshots")
-parser.add_argument("--snapshot_prefix", type=str, default="reference_latest_episode_",
+parser.add_argument("--snapshot_prefix", type=str, default="reference_hra_latest_episode_",
                     help="Filename prefix of model snapshots")
 parser.add_argument("--print_action", action="store_true")
 parser.add_argument("--print_communication", action="store_true")
@@ -29,7 +29,7 @@ parser.add_argument("--memory_capacity", type=int, default=30000,
                     help="capacity for memory replay")
 parser.add_argument("--batch_size", type=int, default=1024,
                     help="batch size")
-parser.add_argument("--n_episode", type=int, default=200000,
+parser.add_argument("--n_episode", type=int, default= 60000,   # 200000,
                     help="max episodes to train")
 parser.add_argument("--max_steps", type=int, default=30,
                     help="max steps to train per episode")
@@ -68,9 +68,9 @@ dim_act_c = []
 for i in range(n_agents):
     if isinstance(env.action_space[i], spaces.MultiDiscrete):
         size = env.action_space[i].high - env.action_space[i].low + 1
-        dim_act_u.append(size[0])
-        dim_act_c.append(size[1])
-        dim_act_list.append(sum(size))
+        dim_act_u.append(int(size[0]))
+        dim_act_c.append(int(size[1]))
+        dim_act_list.append(int(sum(size)))
     elif isinstance(env.action_space[i], spaces.Discrete):
         dim_act_list.append(env.action_space[i].n)
     else:

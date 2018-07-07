@@ -11,6 +11,7 @@ import torchvision.utils as vutils
 import time
 import pdb
 
+time_start = time.time()
 
 # argument parser
 parser = argparse.ArgumentParser()
@@ -30,7 +31,7 @@ parser.add_argument("--memory_capacity", type=int, default=30000,
                     help="capacity for memory replay")
 parser.add_argument("--batch_size", type=int, default=1024,
                     help="batch size")
-parser.add_argument("--n_episode", type=int, default=200000,
+parser.add_argument("--n_episode", type=int, default=50000,
                     help="max episodes to train")
 parser.add_argument("--max_steps", type=int, default=30,
                     help="max steps to train per episode")
@@ -106,8 +107,8 @@ writer = SummaryWriter()
 
 # learning rate decay
 if lr_decay:
-    scheduler_critic = [StepLR(x, step_size=30000, gamma=0.1) for x in maddpg.critic_optimizer]
-    scheduler_actor = [StepLR(x, step_size=30000, gamma=0.1) for x in maddpg.actor_optimizer]
+    scheduler_critic = [StepLR(x, step_size=10000, gamma=0.1) for x in maddpg.critic_optimizer]
+    scheduler_actor = [StepLR(x, step_size=10000, gamma=0.1) for x in maddpg.actor_optimizer]
 
 for i_episode in range(n_episode):
     if lr_decay:
@@ -143,6 +144,7 @@ for i_episode in range(n_episode):
         env.set_level(2)
         env.set_stage(1)
         env.set_obs(2)
+        # env.set_obs(3)
 
     # pdb.set_trace()
     obs = env.reset()
@@ -198,6 +200,7 @@ for i_episode in range(n_episode):
                 action_ls[i] = np.insert(action_ls[i], 4, 0)
 
         obs_, reward, done, _ = env.step(action_ls)
+        # pdb.set_trace()
         total_reward += sum(reward)
         reward = th.FloatTensor(reward).type(FloatTensor)
 
@@ -312,7 +315,9 @@ for i_episode in range(n_episode):
 writer.export_scalars_to_json("./all_scalars.json")
 writer.close()
 
-
+time_end = time.time()
+elapsed_time = time_end - time_start
+print("Time spent: {}".format(time.strftime("%H:%M:%S", time.gmtime(elapsed_time))))
 
 
 

@@ -13,10 +13,13 @@ class Scenario(BaseScenario):
         for i, agent in enumerate(world.agents):
             agent.name = 'agent %d' % i
             agent.collide = False
+            '''
             if i == 0:
                 agent.size = 0.045
             elif i == 1:
                 agent.size = 0.075
+            '''
+            agent.size = 0.075
             # agent.u_noise = 1e-1
             # agent.c_noise = 1e-1
         # add landmarks
@@ -30,7 +33,7 @@ class Scenario(BaseScenario):
         self.reset_world(world)
         return world
 
-    def reset_world(self, world, level=0):
+    def reset_world(self, world, level=2):
         # random properties for agents
         for i, agent in enumerate(world.agents):
             agent.color = np.array([0.25, 0.25, 0.25])
@@ -70,7 +73,7 @@ class Scenario(BaseScenario):
             landmark.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
-    def reward(self, agent, world, stage=0):
+    def reward(self, agent, world, stage=1):
         # if agent.goal_a is None or agent.goal_b is None:
         a0 = world.agents[0]
         a1 = world.agents[1]
@@ -120,7 +123,7 @@ class Scenario(BaseScenario):
 
         return r  # -dist2  # np.exp(-dist2)
 
-    def observation(self, agent, world, obs=0):
+    def observation(self, agent, world, obs=2):
         # goal positions
         # goal_pos = [np.zeros(world.dim_p), np.zeros(world.dim_p)]
         # if agent.goal_a is not None:
@@ -166,6 +169,9 @@ class Scenario(BaseScenario):
             for other in world.agents:
                 if other is agent: continue
                 comm.append(other.state.c)
+
+        elif obs == 3:
+            comm.append(com)
 
         return np.concatenate([agent.state.p_vel] + entity_pos + [goal_color[1]] + comm)
 

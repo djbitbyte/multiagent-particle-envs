@@ -30,7 +30,7 @@ parser.add_argument("--memory_capacity", type=int, default=30000,
                     help="capacity for memory replay")
 parser.add_argument("--batch_size", type=int, default=1024,
                     help="batch size")
-parser.add_argument("--n_episode", type=int, default=200000,
+parser.add_argument("--n_episode", type=int, default=50000,
                     help="max episodes to train")
 parser.add_argument("--max_steps", type=int, default=30,
                     help="max steps to train per episode")
@@ -106,8 +106,8 @@ writer = SummaryWriter()
 
 # learning rate decay
 if lr_decay:
-    scheduler_critic = StepLR(maddpg.critic_optimizer, step_size=30000, gamma=0.1)
-    scheduler_actor = StepLR(maddpg.actor_optimizer, step_size=30000, gamma=0.1)
+    scheduler_critic = StepLR(maddpg.critic_optimizer, step_size=10000, gamma=0.1)
+    scheduler_actor = StepLR(maddpg.actor_optimizer, step_size=10000, gamma=0.1)
 
 for i_episode in range(n_episode):
     if lr_decay:
@@ -256,7 +256,7 @@ for i_episode in range(n_episode):
     print('End of Episode: %d, mean_reward = %f, total_reward = %f' % (i_episode, mean_reward, total_reward))
 
     # plot of reward
-    writer.add_scalar('data/reward_ref_single_brain', mean_reward, i_episode)
+    writer.add_scalar('data/reward_ref', mean_reward, i_episode)   # 'data/reward_ref_single_brain'
 
     # plot of histogram for actions
     if physical_channel == 2:
