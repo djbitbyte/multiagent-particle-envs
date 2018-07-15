@@ -137,6 +137,7 @@ class MADDPG:
                 next_actions.view(-1, self.dim_act_sum)
             )
 
+            # pdb.set_trace()
             # here target_Q is y_i of TD error equation
             # target_Q = (target_Q * self.GAMMA) + (reward_batch[:, agent] * self.scale_reward)
             target_Q = target_Q * self.GAMMA + reward_batch[:, agent:(agent+1)]

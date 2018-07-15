@@ -64,7 +64,7 @@ class Scenario(BaseScenario):
         a = world.agents[0]
         # squared distance and distance from listener to landmark
         dist2 = np.sum(np.square(a.goal_a.state.p_pos - a.goal_b.state.p_pos))
-        dist = np.sqrt(np.sum(np.square(a.goal_a.state.p_pos - a.goal_b.state.p_pos)))
+        dist = np.sqrt(dist2)
         # decide reward here
         r = -dist2-dist
         return r

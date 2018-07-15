@@ -15,9 +15,9 @@ class MultiAgentEnv(gym.Env):
                  done_callback=None, shared_viewer=True, 
                  print_communication=False, print_action=False):
 
-        self.level = 0
-        self.stage = 0
-        self.obs = 0
+        self.level = 2
+        self.stage = 1
+        self.obs = 2
         self.world = world
         self.agents = self.world.policy_agents
         # set required vectorized gym env property

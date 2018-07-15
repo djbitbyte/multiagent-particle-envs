@@ -30,13 +30,13 @@ parser.add_argument("--memory_capacity", type=int, default=30000,
                     help="capacity for memory replay")
 parser.add_argument("--batch_size", type=int, default=1024,
                     help="batch size")
-parser.add_argument("--n_episode", type=int, default=200000,
+parser.add_argument("--n_episode", type=int, default=10000,   # 200000,
                     help="max episodes to train")
 parser.add_argument("--max_steps", type=int, default=30,
                     help="max steps to train per episode")
 parser.add_argument("--episodes_before_train", type=int, default=50,
                     help="episodes that does not train but collect experiences")
-parser.add_argument("--learning_rate", type=float, default=0.005,
+parser.add_argument("--learning_rate", type=float, default=0.005,  # 0.0075,
                     help="learning rate for training")
 parser.add_argument("--weight_decay", type=float, default=0,
                     help="L2 regularization weight decay")

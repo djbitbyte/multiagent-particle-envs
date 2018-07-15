@@ -31,7 +31,7 @@ parser.add_argument("--memory_capacity", type=int, default=30000,
                     help="capacity for memory replay")
 parser.add_argument("--batch_size", type=int, default=1024,
                     help="batch size")
-parser.add_argument("--n_episode", type=int, default=50000,
+parser.add_argument("--n_episode", type=int, default=10000,   # 50000,
                     help="max episodes to train")
 parser.add_argument("--max_steps", type=int, default=30,
                     help="max steps to train per episode")
@@ -73,6 +73,7 @@ curriculum_learning = args.curriculum_learning
 env = make_env('simple_reference',
                print_action=print_action, print_communication=print_communication)
 n_agents = len(env.world.agents)
+det = np.zeros(n_agents)
 dim_obs_list = [env.observation_space[i].shape[0] for i in range(n_agents)]
 
 dim_act_list = []
@@ -157,13 +158,14 @@ for i_episode in range(n_episode):
     av_critics_grad = np.zeros((n_agents, 6))
     av_actors_grad = np.zeros((n_agents, 6))
     n = 0
+    '''
     print('Simple Reference')
     print('Start of episode', i_episode)
     print("Target landmark for agent 0: {}, Target landmark color: {}"
           .format(env.world.agents[1].goal_b.name, env.world.agents[1].goal_b.color))
     print("Target landmark for agent 1: {}, Target landmark color: {}"
           .format(env.world.agents[0].goal_b.name, env.world.agents[0].goal_b.color))
-
+    '''
     if (i_episode % consistency_interval) == 0:
         communication_mappings = np.zeros((n_agents, 3, 3))
     episode_communications = np.zeros((n_agents, 3))
@@ -246,12 +248,13 @@ for i_episode in range(n_episode):
             writer.add_scalar('communication/agent{}_det'.format(agent_i),
                               np.linalg.det(normalized_agent_mapping),
                               i_episode)
+            det[agent_i] = np.linalg.det(normalized_agent_mapping)
             for goal_i in range(3):
                 mapping = communication_mappings[agent_i, goal_i, :]
                 consistency = 1 if mapping.sum() == 0 else mapping.max() / mapping.sum()
                 writer.add_scalar('consistency/agent{}_goal{}'.format(agent_i, goal_i), consistency, i_episode)
                 string += ("{:.1f}% ".format(consistency * 100))
-            print(string)
+            # print(string)
 
     if n != 0:
         av_critics_grad = av_critics_grad / n
@@ -259,7 +262,7 @@ for i_episode in range(n_episode):
 
     maddpg.episode_done += 1
     mean_reward = total_reward / max_steps
-    print('End of Episode: %d, mean_reward = %f, total_reward = %f' % (i_episode, mean_reward, total_reward))
+    # print('End of Episode: %d, mean_reward = %f, total_reward = %f' % (i_episode, mean_reward, total_reward))
 
     # plot of reward
     writer.add_scalar('data/reward_ref', mean_reward, i_episode)
@@ -292,7 +295,7 @@ for i_episode in range(n_episode):
 
     # to save models every N episodes
     if i_episode != 0 and i_episode % snapshot_interval == 0:
-        print('Save models!')
+        # print('Save models!')
         if maddpg.action_noise == "OU_noise":
             states = {'critics': maddpg.critics,
                       'actors': maddpg.actors,
@@ -318,7 +321,7 @@ writer.close()
 time_end = time.time()
 elapsed_time = time_end - time_start
 print("Time spent: {}".format(time.strftime("%H:%M:%S", time.gmtime(elapsed_time))))
-
+print("Determinant of comm mapping: {}".format(det))
 
 
 
